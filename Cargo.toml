@@ -1,0 +1,16 @@
+[package]
+name = "asa-graphs"
+version = "0.1.0"
+edition = "2021"
+authors = ["danbulnet <daniel@bulanda.net>"]
+default-run = "asa_graphs"
+
+[lib]
+name = "asa_graphs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "asa_graphs"
+path = "src/bin/main.rs"
+
+[dependencies]
