@@ -21,8 +21,10 @@ pub struct ASAGraph<Key, const ORDER: usize = 25>
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
     pub name: String,
     pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
-    pub(crate) element_min: *mut Element<Key, ORDER>,
-    pub(crate) element_max: *mut Element<Key, ORDER>
+    pub(crate) element_min: Option<Rc<RefCell<Element<Key, ORDER>>>>,
+    pub(crate) element_max: Option<Rc<RefCell<Element<Key, ORDER>>>>,
+    pub key_min: Option<Key>,
+    pub key_max: Option<Key>
 }
 
 // impl<Key, const ORDER: usize> Sensor for ASAGraph<Key, ORDER> 
@@ -45,74 +47,80 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         ASAGraph {
             name: name.to_string(),
             root: Rc::new(RefCell::new(Node::<Key, ORDER>::new(true, None))),
-            element_min: ptr::null_mut(),
-            element_max: ptr::null_mut()
+            element_min: None,
+            element_max: None,
+            key_min: None,
+            key_max: None
         }
     }
 
-//     pub fn search(&self, key: &Key) -> Option<&Element<Key, ORDER>> {
-//         let node = &self.root;
+    pub fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
+        let node = &self.root;
         
-//         let (key_min, key_max) = self.extreme_keys()?;
+        let (key_min, key_max) = self.extreme_keys()?;
 
-//         if key.distance(key_max) > key.distance(key_min) {
-//             return Self::search_left(key, node)
-//         } else {
-//             return Self::search_right(key, node)
-//         }
-//     }
+        if key.distance(key_max) > key.distance(key_min) {
+            return Self::search_left(key, &*node.borrow())
+        } else {
+            return Self::search_right(key, &*node.borrow())
+        }
+    }
 
-//     fn search_left<'a, 'b>(key: &'a Key, node: &'b Node<Key, ORDER>) -> Option<&'b Element<Key, ORDER>> {
-//         let mut node = node;
-//         loop {
-//             let mut index = 0;
-            
-//             let mut element = node.elements[index].as_ref().unwrap();
-//             let mut element_key = &element.key;
-            
-//             while index < node.size && key > element_key {
-//                 index += 1;
-//                 if index < node.size {
-//                     element = node.elements[index].as_ref().unwrap();
-//                     element_key = &element.key;
-//                 }
-//             }
+    fn search_left<'a, 'b>(
+        key: &'a Key, mut node: &'b Node<Key, ORDER>
+    ) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
+        loop {
+            let mut index = 0;
+            {
+                let mut current_key = node.keys[index].as_ref().unwrap();
+                
+                while index < node.size && key > current_key {
+                    index += 1;
+                    if index < node.size {
+                        current_key = node.keys[index].as_ref().unwrap();
+                    }
+                }
 
-//             if index < node.size && key == element_key {
-//                 return Some(element)
-//             } else if node.is_leaf {
-//                 return None
-//             } else {
-//                 node = node.children[index].as_ref().unwrap();
-//             }
-//         }
-//     }
+                if index < node.size && key == current_key {
+                    let element = node.elements[index].as_ref().unwrap().clone();
+                    return Some(element)
+                } else if node.is_leaf {
+                    return None
+                }
+            }
+                
+            let node_ptr = node.children[index].as_ref().unwrap();
+            unsafe { node = node_ptr.try_borrow_unguarded().unwrap() };
+        }
+    }
 
-//     fn search_right<'a, 'b>(key: &'a Key, node: &'b Node<Key, ORDER>) -> Option<&'b Element<Key, ORDER>> {
-//         let mut node = node;
-//         loop {
-//             let mut index = node.size - 1;
-            
-//             let mut element = node.elements[index].as_ref().unwrap();
-//             let mut element_key = &element.key;
-            
-//             while index > 0 && key < element_key {
-//                 index -= 1;
-//                 element = node.elements[index].as_ref().unwrap();
-//                 element_key = &element.key;
-//             }
+    fn search_right<'a, 'b>(
+        key: &'a Key, mut node: &'b Node<Key, ORDER>
+    ) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
+        loop {
+            let mut index = node.size - 1;
+            {
+                let mut current_key = node.keys[index].as_ref().unwrap();
+                
+                while index > 0 && key < current_key {
+                    index -= 1;
+                    current_key = node.keys[index].as_ref().unwrap();
+                }
 
-//             if key == element_key {
-//                 return Some(element)
-//             } else if node.is_leaf {
-//                 return None
-//             } else if key > element_key {
-//                 node = node.children[index + 1].as_ref().unwrap();
-//             } else {
-//                 node = node.children[index].as_ref().unwrap();
-//             }
-//         }
-//     }
+                if key == current_key {
+                    let element = node.elements[index].as_ref().unwrap().clone();
+                    return Some(element)
+                } else if node.is_leaf {
+                    return None
+                } else if key > current_key {
+                    // node = node.children[index + 1].as_ref().unwrap().borrow();
+                    index += 1;
+                }
+            }
+            let node_ptr = node.children[index].as_ref().unwrap();
+            unsafe { node = node_ptr.try_borrow_unguarded().unwrap() };
+        }
+    }
 
 //     pub fn insert(&mut self, key: &Key) -> &Element<Key, ORDER> {
 //         let self_ptr = self as *mut ASAGraph::<Key, ORDER>;
@@ -203,15 +211,12 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
 //         }
 //     }
 
-//     fn extreme_keys(&self) -> Option<(&Key, &Key)> {
-//         if self.element_min.is_null() || self.element_max.is_null() {
-//             return None
-//         }
-//         let element_min =  unsafe { &*self.element_min };
-//         let element_max =  unsafe { &*self.element_max };
-
-//         Some((&element_min.key, &element_max.key))
-//     }
+    fn extreme_keys<'a>(&'a self) -> Option<(&'a Key, &'a Key)> {
+        if self.key_min.is_none() || self.key_max.is_none() { return None }
+        let key_min =  self.key_min.as_ref().unwrap();
+        let key_max =  self.key_max.as_ref().unwrap();
+        Some((key_min, key_max))
+    }
 
 //     fn insert_first_element(
 //         &mut self, node: &mut Node<Key, ORDER>,  key: &Key
