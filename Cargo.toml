@@ -14,6 +14,8 @@ name = "asa_graphs"
 path = "src/bin/main.rs"
 
 [dependencies]
+bionet-common = { git = "https://github.com/danbulnet/bionet-common.git", version = "0.1.0" }
+rand = "0.8.5"
 
 [dev-dependencies]
 pretty_assertions = "1.2.1"
