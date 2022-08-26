@@ -1,7 +1,8 @@
 use std::{
     fmt::{ Display, Formatter, Result },
     rc::{ Rc, Weak },
-    cell::RefCell
+    cell::RefCell,
+    ptr
 };
 
 use bionet_common::{
@@ -19,19 +20,19 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     pub counter: usize,
     pub(crate) next: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub(crate) prev: Option<Weak<RefCell<Element<Key, ORDER>>>>,
-    pub(crate) parent: Weak<RefCell<ASAGraph<Key, ORDER>>>
+    pub(crate) parent: *mut ASAGraph<Key, ORDER>
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:  {
-    pub fn new(key: &Key, parent: &Rc<RefCell<ASAGraph<Key, ORDER>>>)
+    pub fn new(key: &Key, parent: *mut ASAGraph<Key, ORDER>)
     -> Element<Key, ORDER> {
         Element {
             key: key.clone(),
             next: None,
             prev: None,
             counter: 1,
-            parent: Rc::downgrade(parent)
+            parent
         }
     }
 
@@ -58,6 +59,10 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             element.next = None; 
         }
     }
+
+    pub unsafe fn get_parent_ptr(&self) -> Option<*mut ASAGraph<Key, ORDER>> {
+        if self.parent.is_null() { None } else { Some(self.parent) }
+    }
 }
 
 impl<Key, const ORDER: usize> Display for Element<Key, ORDER> 
@@ -74,6 +79,8 @@ mod tests {
         cell::RefCell
     };
 
+    use bionet_common::sensor::Sensor;
+
     use crate::{
         element::Element,
         graph::ASAGraph
@@ -82,10 +89,11 @@ mod tests {
     #[test]
     fn set_connections() {
         let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
+        let graph_ptr = &mut *graph.borrow_mut() as *mut ASAGraph<i32, 3>;
 
-        let element_1_ptr = Rc::new(RefCell::new(Element::new(&1, &graph)));
-        let element_2_ptr = Rc::new(RefCell::new(Element::new(&2, &graph)));
-        let element_3_ptr = Rc::new(RefCell::new(Element::new(&3, &graph)));
+        let element_1_ptr = Rc::new(RefCell::new(Element::new(&1, graph_ptr)));
+        let element_2_ptr = Rc::new(RefCell::new(Element::new(&2, graph_ptr)));
+        let element_3_ptr = Rc::new(RefCell::new(Element::new(&3, graph_ptr)));
 
         assert!(element_1_ptr.borrow().prev.is_none());
         assert!(element_1_ptr.borrow().next.is_none());
@@ -133,5 +141,16 @@ mod tests {
         assert!(element_2_ptr.borrow().next.is_none());
         assert!(element_3_ptr.borrow().prev.is_none());
         assert!(element_3_ptr.borrow().next.is_none());
+    }
+
+    #[test]
+    fn parent_name() {
+        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
+        let graph_ptr = &mut *graph.borrow_mut() as *mut ASAGraph<i32, 3>;
+
+        let element_1_ptr = Rc::new(RefCell::new(Element::new(&1, graph_ptr)));
+        let parent_ptr = unsafe { element_1_ptr.borrow().get_parent_ptr() };
+        let parent_name = unsafe { (&*parent_ptr.unwrap()).name.clone() };
+        assert_eq!(parent_name, "test");
     }
 }

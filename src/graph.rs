@@ -122,61 +122,45 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         }
     }
 
-//     pub fn insert(&mut self, key: &Key) -> &Element<Key, ORDER> {
-//         let self_ptr = self as *mut ASAGraph::<Key, ORDER>;
-//         let mut node = &mut self.root;
-//         let mut node_ptr = node as *mut Node<Key, ORDER>;
+    pub fn insert(&mut self, key: &Key) -> Rc<RefCell<Element<Key, ORDER>>> {
+        let mut node = self.root.clone();
 
-//         if node.size == 0 { 
-//             return unsafe { (&mut *self_ptr).insert_first_element(node, key) }
-//         }
+        if node.borrow().size == 0 { return self.insert_first_element(&node, key) }
 
-//         let (key_min, key_max) = unsafe {
-//             (&mut *self_ptr).extreme_keys().unwrap_or_else(|| {
-//                 panic!("element_min / element_min must not be nullptr")
-//             })
-//         };
+        if node.borrow().size == Node::<Key, ORDER>::MAX_KEYS { node = self.split_root(); }
 
-//         if node.size == Node::<Key, ORDER>::MAX_KEYS {
-//             unsafe { node = (&mut *self_ptr).split_root() }
-//         }
+        let (key_min, key_max) = self.extreme_keys().unwrap_or_else(|| {
+            panic!("element_min / element_min must not be nullptr")
+        });
 
-//         loop {
-//             let node_insert_result;
-//             unsafe {
-//                 println!("maxdist {} mindist {}", key.distance(key_max), key.distance(key_min));
-//                 println!("key_max {} key_min {}", key_max, key_min);
-//                 if key.distance(key_max) > key.distance(key_min) {
-//                     println!("left");
-//                     node_insert_result = (&mut *node_ptr).insert_existing_key(key, true);
-//                 } else {
-//                     println!("right");
-//                     node_insert_result = (&mut *node_ptr).insert_existing_key(key, false);
-//                 };
-//             }
-//             if let Some(el) = node_insert_result.0 { return el }
-//             let mut index = node_insert_result.1;
+        loop {
+            let node_insert_result = if key.distance(key_max) > key.distance(key_min) {
+                node.borrow().insert_existing_key(key, true)
+            } else {
+                node.borrow().insert_existing_key(key, false)
+            };
+            if let Some(el) = node_insert_result.0 { return el }
+            let mut index = node_insert_result.1;
     
-//             if node.is_leaf {
-//                 println!("key_min {key_min}, key_max {key_max}");
-//                 let element = unsafe {
-//                     (&mut *node_ptr).insert_key_leaf(key, self_ptr)
-//                 };
-//                 println!("key_min {key_min}, key_max {key_max}");
-//                 unsafe { (&mut *self_ptr).set_extrema(
-//                     element as *mut Element<Key, ORDER>, key_min, key_max
-//                 ); }
-//                 return element
-//             } else {
-//                 if node.children[index].as_ref().unwrap().size == Node::<Key, ORDER>::MAX_KEYS {
-//                     node.split_child(index);
-//                     if key > &node.elements[index].as_ref().unwrap().key { index += 1 }
-//                 }
-//                 node = node.children[index].as_mut().unwrap();
-//                 node_ptr = node as *mut Node<Key, ORDER>;
-//             }
-//         }
-//     }
+            if node.borrow().is_leaf {
+                let element = Node::insert_key_leaf(
+                    &node, key, self as *mut ASAGraph<Key, ORDER>
+                );
+                self.set_extrema(&element);
+                return element
+            } else {
+                let child_size = node.borrow().children[index].as_ref().unwrap().borrow().size;
+                if child_size == Node::<Key, ORDER>::MAX_KEYS {
+                    Node::split_child(&node, 0);
+                    if key > &node.borrow().elements[index].as_ref().unwrap().borrow().key {
+                        index += 1 
+                    }
+                }
+                let new_node = node.borrow().children[index].as_ref().unwrap().clone();
+                node = new_node.clone();
+            }
+        }
+    }
 
 //     pub fn print_tree(&self) {
 //         let mut height = 0;
@@ -218,51 +202,55 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         Some((key_min, key_max))
     }
 
-//     fn insert_first_element(
-//         &mut self, node: &mut Node<Key, ORDER>,  key: &Key
-//     ) -> &Element<Key, ORDER> {
-//         node.elements[0] = Some(
-//             Element::<Key, ORDER>::new(key, self as *mut ASAGraph<Key, ORDER>)
-//         );
-//         let element_pointer = 
-//             node.elements[0].as_mut().unwrap() as *mut Element<Key, ORDER>;
-//         self.element_min = element_pointer;
-//         self.element_max = element_pointer;
-//         node.size = 1;
+    fn insert_first_element(
+        &mut self, node: &Rc<RefCell<Node<Key, ORDER>>>,  key: &Key
+    ) -> Rc<RefCell<Element<Key, ORDER>>> {
+        let element_pointer = Rc::new(
+            RefCell::new(Element::<Key, ORDER>::new(key, self as *mut ASAGraph<Key, ORDER>))
+        );
+        node.borrow_mut().elements[0] = Some(element_pointer.clone());
 
-//         return unsafe { &*element_pointer }
-//     }
+        self.key_min = Some(key.clone());
+        self.key_max = Some(key.clone());
+        self.element_min = Some(element_pointer.clone());
+        self.element_max = Some(element_pointer.clone());
+        node.borrow_mut().size = 1;
 
-//     fn split_root(&mut self) -> &mut Node<Key, ORDER> {
-//         let mut root_placeholder = Node::<Key, ORDER>::new(false);
-//         // mem::swap(&mut root_placeholder, &mut self.root);
-//         root_placeholder = mem::replace(&mut self.root, root_placeholder);
-//         let root = &mut self.root;
-//         root.children[0] = Some(root_placeholder);
-//         root.split_child(0);
-//         root
-//         // let root_old = self.root.clone();
-//         // self.root = Node::<Key, ORDER>::new(false);
-//         // self.root.children[0] = Some(root_old);
-//         // self.root.split_child(0);
-//         // &mut self.root
-//     }
+        element_pointer
+    }
 
-//     fn set_extrema(
-//         &mut self, element: *mut Element<Key, ORDER>, key_min: &Key, key_max: &Key
-//     ) {
-//         let key = unsafe { &(&*element).key };
+    fn split_root(&mut self) -> Rc<RefCell<Node<Key, ORDER>>> {
+        let new_root = Rc::new(RefCell::new(Node::new(false, None)));
+        let old_root = self.root.clone();
+        self.root = new_root;
+        old_root.borrow_mut().parent = Some(Rc::downgrade(&self.root));
+        self.root.borrow_mut().children[0] = Some(old_root);
+        Node::split_child(&self.root, 0);
+        self.root.clone()
+    }
 
-//         println!("set_extrema: k:{key} min:{key_min} max:{key_max}");
-//         if key < key_min {
-//             println!("+");
-//             self.element_min = element as *mut Element<Key, ORDER>;
-//         }
-//         if key > key_max {
-//             println!("-");
-//             self.element_max = element as *mut Element<Key, ORDER>;
-//         }
-//     }
+    fn set_extrema(&mut self, element: &Rc<RefCell<Element<Key, ORDER>>>) {
+        let key = &element.borrow().key;
+        let key_min = &self.key_min;
+        let key_max = &self.key_max;
+        if key_min.is_none() != key_max.is_none() {
+            panic!("inconsistent extremas: key_min.is_none() != key_max.is_none()")
+        } else if self.key_min.is_none() || self.key_max.is_none() {
+            self.key_min = Some(key.clone());
+            self.key_max = Some(key.clone());
+            self.element_min = Some(element.clone());
+            self.element_max = Some(element.clone());
+        } else {
+            if key < key_min.as_ref().unwrap() {
+                self.key_min = Some(key.clone());
+                self.element_min = Some(element.clone());
+            }
+            if key > key_max.as_ref().unwrap() {
+                self.key_max = Some(key.clone());
+                self.element_max = Some(element.clone());
+            }   
+        }
+    }
 }
 
 // #[cfg(test)]

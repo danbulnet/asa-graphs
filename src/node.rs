@@ -137,22 +137,15 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         left_node.borrow_mut().size = Self::MIN_ELEMENTS;
 
         for i in 0..Self::MIN_ELEMENTS {
-            right_node.elements[i] = 
-                left_node.borrow_mut().elements[Self::T_OFFSET + i].take();
-            right_node.keys[i] = 
-                left_node.borrow_mut().keys[Self::T_OFFSET + i].take();
+            right_node.elements[i] = left_node.borrow_mut().elements[Self::T_OFFSET + i].take();
+            right_node.keys[i] = left_node.borrow_mut().keys[Self::T_OFFSET + i].take();
         }
 
-        // if child_index + 2 < Self::MAX_CHILDREN {
-            println!("(child_index + 1) {} .. (node_size + 1) {}", child_index + 1, node_size + 1);
-            for i in ((child_index + 1)..(node_size)).rev() {
-                node_ptr.borrow_mut().children.swap(i, i + 1);
-                // node_ptr.borrow_mut().children[i + 1] = 
-                //     node_ptr.borrow_mut().children[i].take();
-            }
-        // }
-        node_ptr.borrow_mut().children[child_index + 1] = 
-            Some(Rc::new(RefCell::new(right_node)));
+        for i in ((child_index + 1)..(node_size)).rev() {
+            node_ptr.borrow_mut().children.swap(i, i + 1);
+        }
+
+        node_ptr.borrow_mut().children[child_index + 1] = Some(Rc::new(RefCell::new(right_node)));
         let right_node = 
             node_ptr.borrow().children[child_index + 1].as_ref().unwrap().clone();
         
@@ -160,24 +153,15 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             for i in 0..Self::MIN_CHILDREN {
                 right_node.borrow_mut().children[i] = 
                     left_node.borrow_mut().children[Self::T_OFFSET + i].take();
-                right_node.borrow_mut().children[i].as_ref().unwrap().borrow_mut()
-                    .parent = Some(Rc::downgrade(
-                        // &node_ptr.borrow().children[child_index + 1].as_ref().unwrap()
-                        &right_node
-                    ));
+                right_node.borrow_mut().children[i].as_ref().unwrap().borrow_mut().parent 
+                    = Some(Rc::downgrade(&right_node));
             }
         }
 
-        // if child_index + 1 < Self::MAX_ELEMENTS {
-            for i in ((child_index as isize)..(node_size as isize - 1isize)).rev() {
-                node_ptr.borrow_mut().elements.swap(i as usize, (i + 1) as usize);
-                node_ptr.borrow_mut().keys.swap(i as usize, (i + 1) as usize);
-                // node_ptr.borrow_mut().elements[i + 1] = 
-                //     node_ptr.borrow_mut().elements[i].take();
-                // node_ptr.borrow_mut().keys[i + 1] = 
-                //     node_ptr.borrow_mut().keys[i].take();
-            }
-        // }
+        for i in ((child_index as isize)..(node_size as isize - 1isize)).rev() {
+            node_ptr.borrow_mut().elements.swap(i as usize, (i + 1) as usize);
+            node_ptr.borrow_mut().keys.swap(i as usize, (i + 1) as usize);
+        }
         node_ptr.borrow_mut().elements[child_index] = 
             left_node.borrow_mut().elements[Self::MID_INDEX].take();
         node_ptr.borrow_mut().keys[child_index] = 
@@ -186,7 +170,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     }
 
     pub(crate) fn insert_existing_key(&self, key: &Key, left_search: bool)
-    -> (Option<RefMut<Element<Key, ORDER>>>, usize) {
+    -> (Option<Rc<RefCell<Element<Key, ORDER>>>>, usize) {
         let mut index;
         if left_search {
             index = 0usize;
@@ -196,8 +180,8 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
                 current_key = self.keys[index].as_ref().unwrap();
             }
             if index < self.size && key == current_key {
-                let mut element = self.elements[index].as_ref().unwrap().borrow_mut();
-                element.counter += 1;
+                let mut element = self.elements[index].as_ref().unwrap().clone();
+                element.borrow_mut().counter += 1;
                 return (Some(element), index)
             }
         } else {
@@ -210,54 +194,54 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             if key > current_key {
                 index += 1;
             } else if key == current_key {
-                let mut element = self.elements[index].as_ref().unwrap().borrow_mut();
-                element.counter += 1;
+                let mut element = self.elements[index].as_ref().unwrap().clone();
+                element.borrow_mut().counter += 1;
                 return (Some(element), index)
             }
 
             if index < self.size && key == current_key {
-                let mut element = self.elements[index].as_ref().unwrap().borrow_mut();
-                element.counter += 1;
+                let mut element = self.elements[index].as_ref().unwrap().clone();
+                element.borrow_mut().counter += 1;
                 return (Some(element), index)
             }
         }
         (None, index)
     }
 
-    pub(crate) fn insert_key_leaf<'a>(
-        node_ptr: &'a Rc<RefCell<Node<Key, ORDER>>>, 
-        key: &'a Key, 
-        parent: &'a Rc<RefCell<ASAGraph<Key, ORDER>>>
-    ) -> Ref<'a, Element<Key, ORDER>> {
-        let node_ptr_raw = node_ptr.as_ptr();
-        let mut node = node_ptr.borrow_mut();
+    pub(crate) fn insert_key_leaf(
+        node: &Rc<RefCell<Node<Key, ORDER>>>, 
+        key: &Key, 
+        parent: *mut ASAGraph<Key, ORDER>
+    ) -> Rc<RefCell<Element<Key, ORDER>>> {
+        let node_size = node.borrow().size;
 
-        let mut index = node.size - 1;
-        let mut counter = node.size as isize - 1;
+        let mut index = node_size - 1;
+        let mut counter = node_size as isize - 1;
         let mut should_move = false;
-        while counter >= 0 && key < node.keys[counter as usize].as_ref().unwrap() {
+        while counter >= 0 && key < node.borrow().keys[counter as usize].as_ref().unwrap() {
             should_move = true;
             index = counter as usize;
             counter -= 1;
         }
 
         if should_move {
-            for i in (index..node.size).rev() {
-                node.elements[i + 1] = node.elements[i].take();
-                node.keys[i + 1] = node.keys[i].take();
+            for i in (index..node_size).rev() {
+                node.borrow_mut().elements.swap(i, i + 1);
+                node.borrow_mut().keys.swap(i, i + 1);
             }
         } else {
             index += 1;
         }
         
-        node.elements[index] = Some(Rc::new(RefCell::new(Element::new(key, parent))));
-        node.keys[index] = Some(key.clone());
+        let new_element = Rc::new(RefCell::new(Element::new(key, parent)));
+        node.borrow_mut().elements[index] = Some(new_element.clone());
+        node.borrow_mut().keys[index] = Some(key.clone());
 
         let mut next_ptr = None;
         let mut prev_ptr = None;
-        if node.size >= 1 {
+        if node_size >= 1 {
             if index == 0 {
-                if let Some(next) = node.elements[1].as_ref() {
+                if let Some(next) = node.borrow().elements[1].as_ref() {
                     next_ptr = Some(next.clone());
                     prev_ptr = match next.as_ref().borrow().prev.as_ref() {
                         Some(v) => Some(v.upgrade().unwrap()),
@@ -265,24 +249,19 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
                     };
                 }
             } else {
-                if let Some(prev) = node.elements[index - 1].as_ref() {
+                if let Some(prev) = node.borrow().elements[index - 1].as_ref() {
                     prev_ptr = Some(prev.clone());
                     next_ptr = prev.as_ref().borrow().next.clone();
                 }
             }
         }
 
-        let new_element = unsafe {
-            (&*node_ptr_raw).elements[index].as_ref().unwrap()
-        };
         Element::<Key, ORDER>::set_connections(
-            new_element, 
-            prev_ptr.as_ref(), 
-            next_ptr.as_ref()
+            &new_element, prev_ptr.as_ref(), next_ptr.as_ref()
         );
-        node.size += 1;
+        node.borrow_mut().size += 1;
 
-        new_element.as_ref().borrow()
+        new_element
     }
 
     pub const MIN_CHILDREN: usize = (ORDER + 1) / 2;
@@ -355,13 +334,13 @@ mod tests {
         let root: &Rc<RefCell<Node<i32, 3>>> = &graph.borrow().root;
 
         root.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&2, &graph)))
+            Rc::new(RefCell::new(Element::new(&2, graph.as_ptr())))
         );
         root.borrow_mut().keys[0] = Some(2);
         root.borrow_mut().size = 1;
 
-        Node::insert_key_leaf(&root, &-1, &graph);
-        Node::insert_key_leaf(&root, &1, &graph);
+        Node::insert_key_leaf(&root, &-1, graph.as_ptr());
+        Node::insert_key_leaf(&root, &1, graph.as_ptr());
         root.borrow().insert_existing_key(&1, true);
         root.borrow().insert_existing_key(&-1, true);
         root.borrow().insert_existing_key(&2, true);
@@ -387,13 +366,13 @@ mod tests {
         let root: &Rc<RefCell<Node<i32, 3>>> = &graph.borrow().root;
 
         root.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&1, &graph)))
+            Rc::new(RefCell::new(Element::new(&1, graph.as_ptr())))
         );
         root.borrow_mut().keys[0] = Some(1);
         root.borrow_mut().size = 1;
 
-        Node::insert_key_leaf(&root, &6, &graph);
-        Node::insert_key_leaf(&root, &7, &graph);
+        Node::insert_key_leaf(&root, &6, graph.as_ptr());
+        Node::insert_key_leaf(&root, &7, graph.as_ptr());
 
         let root_new = Rc::new(RefCell::new(Node::new(false, None)));
         root_new.borrow_mut().children[0] = Some(root.clone());
@@ -421,14 +400,14 @@ mod tests {
         assert!(root_new.borrow().children[0].as_ref().unwrap().borrow().elements[1].is_none());
         assert!(root_new.borrow().children[1].as_ref().unwrap().borrow().elements[1].is_none());
 
-        Node::insert_key_leaf(&root_new, &2, &graph);
-        Node::insert_key_leaf(&root_new, &4, &graph);
+        Node::insert_key_leaf(&root_new, &2, graph.as_ptr());
+        Node::insert_key_leaf(&root_new, &4, graph.as_ptr());
 
         let middle_left_node = Rc::new(
             RefCell::new(Node::new(true, Some(Rc::downgrade(&root_new))))
         );
         middle_left_node.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&3, &graph)))
+            Rc::new(RefCell::new(Element::new(&3, graph.as_ptr())))
         );
         middle_left_node.borrow_mut().keys[0] = Some(3);
         middle_left_node.borrow_mut().size = 1;
@@ -437,7 +416,7 @@ mod tests {
             RefCell::new(Node::new(true, Some(Rc::downgrade(&root_new))))
         );
         middle_right_node.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&5, &graph)))
+            Rc::new(RefCell::new(Element::new(&5, graph.as_ptr())))
         );
         middle_right_node.borrow_mut().keys[0] = Some(5);
         middle_right_node.borrow_mut().size = 1;
