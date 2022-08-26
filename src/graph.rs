@@ -20,7 +20,7 @@ use crate::{
 pub struct ASAGraph<Key, const ORDER: usize = 25>
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
     pub name: String,
-    pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
+    pub root: Rc<RefCell<Node<Key, ORDER>>>,
     pub(crate) element_min: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub(crate) element_max: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub key_min: Option<Key>,
@@ -113,7 +113,6 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
                 } else if node.is_leaf {
                     return None
                 } else if key > current_key {
-                    // node = node.children[index + 1].as_ref().unwrap().borrow();
                     index += 1;
                 }
             }
@@ -151,9 +150,11 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             } else {
                 let child_size = node.borrow().children[index].as_ref().unwrap().borrow().size;
                 if child_size == Node::<Key, ORDER>::MAX_KEYS {
-                    Node::split_child(&node, 0);
+                    Node::split_child(&node, index);
                     if key > &node.borrow().elements[index].as_ref().unwrap().borrow().key {
                         index += 1 
+                    } else if key == node.borrow().keys[index].as_ref().unwrap() {
+                        return node.borrow().elements[index].as_ref().unwrap().clone()
                     }
                 }
                 let new_node = node.borrow().children[index].as_ref().unwrap().clone();
@@ -162,38 +163,39 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         }
     }
 
-//     pub fn print_tree(&self) {
-//         let mut height = 0;
-//         let mut node = &self.root;
-//         let mut queue: Vec<Vec<&Node<Key, ORDER>>> = vec![vec![]];
-//         queue[0].push(node);
+    pub fn print_tree(&self) {
+        let mut height = 0;
+        let mut node = self.root.clone();
+        let mut queue: Vec<Vec<Rc<RefCell<Node<Key, ORDER>>>>> = vec![vec![]];
+        queue[0].push(node.clone());
 
-//         loop {
-//             queue.push(vec![]);
-//             for i in 0..(queue[height].len()) {
-//                 node = queue[height][i];
-//                 print!("||");
-//                 for j in 0..(node.size) {
-//                     let element = &node.elements[j].as_ref().unwrap();
-//                     print!("{}:{}|", &element.key, element.counter);
-//                     if !node.is_leaf {
-//                         queue[height + 1].push(node.children[j].as_ref().unwrap());
-//                     }
-//                 }
-//                 if !node.is_leaf {
-//                     queue[height + 1].push(node.children[node.size].as_ref().unwrap());
-//                 }
-//                 print!("| ");
-//             }
-//             if queue.last().unwrap().len() > 0 {
-//                 height += 1;
-//                 println!("");
-//             } else {
-//                 println!("");
-//                 return
-//             }
-//         }
-//     }
+        loop {
+            queue.push(vec![]);
+            for i in 0..(queue[height].len()) {
+                node = queue[height][i].clone();
+                let node_size = node.borrow().size;
+                print!("||");
+                for j in 0..(node_size) {
+                    let element = node.borrow().elements[j].as_ref().unwrap().clone();
+                    print!("{}:{}|", &element.borrow().key, element.borrow().counter);
+                    if !node.borrow().is_leaf {
+                        queue[height + 1].push(node.borrow().children[j].as_ref().unwrap().clone());
+                    }
+                }
+                if !node.borrow().is_leaf {
+                    queue[height + 1].push(node.borrow().children[node_size].as_ref().unwrap().clone());
+                }
+                print!("| ");
+            }
+            if queue.last().unwrap().len() > 0 {
+                height += 1;
+                println!("");
+            } else {
+                println!("");
+                return
+            }
+        }
+    }
 
     fn extreme_keys<'a>(&'a self) -> Option<(&'a Key, &'a Key)> {
         if self.key_min.is_none() || self.key_max.is_none() { return None }
@@ -209,6 +211,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             RefCell::new(Element::<Key, ORDER>::new(key, self as *mut ASAGraph<Key, ORDER>))
         );
         node.borrow_mut().elements[0] = Some(element_pointer.clone());
+        node.borrow_mut().keys[0] = Some(key.clone());
 
         self.key_min = Some(key.clone());
         self.key_max = Some(key.clone());
@@ -253,69 +256,69 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     }
 }
 
-// #[cfg(test)]
-// pub mod tests {
-//     use rand::Rng;
-//     use std::{ io::{self, Write}, time::Instant };
+#[cfg(test)]
+pub mod tests {
+    use rand::Rng;
+    use std::{ io::{self, Write}, time::Instant };
     
-//     use super::ASAGraph;
+    use super::ASAGraph;
 
-//     #[test]
-//     fn create_empty_graph() {
-//         ASAGraph::<i32, 3>::new("test");
-//     }
+    #[test]
+    fn create_empty_graph() {
+        ASAGraph::<i32, 3>::new("test");
+    }
 
-//     #[test]
-//     fn create_100_elements_graph() {
-//         let mut rng = rand::thread_rng();
+    #[test]
+    fn create_100_elements_graph() {
+        let mut rng = rand::thread_rng();
 
-//         let start = Instant::now();
+        let start = Instant::now();
 
-//         let mut graph = ASAGraph::<i32, 3>::new("test");
+        let mut graph = ASAGraph::<i32, 3>::new("test");
 
-//         let n = 1_000_000;
-//         for _ in 0..n {
-//             let number: i32 = rng.gen();
-//             graph.insert(&number);
-//         }
+        let n = 1_000_000;
+        for _ in 0..n {
+            let number: i32 = rng.gen();
+            graph.insert(&number);
+        }
 
-//         let duration = start.elapsed();
+        let duration = start.elapsed();
 
-//         println!("Time elapsed for ASAGraph insertion of {} elements is is: {:?}", n, duration);
-//     }
+        println!("Time elapsed for ASAGraph insertion of {} elements is is: {:?}", n, duration);
+    }
 
-//     #[test]
-//     fn print_tree() {
-//         let mut rng = rand::thread_rng();
+    #[test]
+    fn print_tree() {
+        let mut rng = rand::thread_rng();
 
-//         let mut graph = ASAGraph::<i32, 3>::new("test");
+        let mut graph = ASAGraph::<i32, 3>::new("test");
 
-//         for _ in 0..50 {
-//             let number: i32 = rng.gen_range(1..=20);
-//             graph.insert(&number);
-//         }
+        for _ in 0..50 {
+            let number: i32 = rng.gen_range(1..=20);
+            graph.insert(&number);
+        }
 
-//         io::stdout().flush().unwrap();
-//         graph.print_tree();
-//         io::stdout().flush().unwrap();
-//     }
+        io::stdout().flush().unwrap();
+        graph.print_tree();
+        io::stdout().flush().unwrap();
+    }
 
-//     #[test]
-//     fn search() {
-//         let mut graph = ASAGraph::<i32, 3>::new("test");
+    #[test]
+    fn search() {
+        let mut graph = ASAGraph::<i32, 3>::new("test");
 
-//         let n = 100;
-//         for i in 0..n {
-//             graph.insert(&i);
-//         }
+        let n = 100;
+        for i in 0..n {
+            graph.insert(&i);
+        }
 
-//         for i in 0..n {
-//             assert!(graph.search(&i).is_some());
-//         }
+        for i in 0..n {
+            assert!(graph.search(&i).is_some());
+        }
         
-//         assert!(graph.search(&101).is_none());
-//         assert!(graph.search(&-1).is_none());
-//     }
+        assert!(graph.search(&101).is_none());
+        assert!(graph.search(&-1).is_none());
+    }
 
     // #[test]
     // fn test_connections() {
@@ -344,4 +347,4 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     //         current_element = prev_element.borrow().next.as_ref().unwrap().clone();
     //     }
     // }
-// }
+}

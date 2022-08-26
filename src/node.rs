@@ -141,8 +141,12 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             right_node.keys[i] = left_node.borrow_mut().keys[Self::T_OFFSET + i].take();
         }
 
-        for i in ((child_index + 1)..(node_size)).rev() {
+        for i in ((child_index + 1)..=(node_size)).rev() {
             node_ptr.borrow_mut().children.swap(i, i + 1);
+        }
+        for i in ((child_index as isize)..=(node_size as isize - 1isize)).rev() {
+            node_ptr.borrow_mut().elements.swap(i as usize, (i + 1) as usize);
+            node_ptr.borrow_mut().keys.swap(i as usize, (i + 1) as usize);
         }
 
         node_ptr.borrow_mut().children[child_index + 1] = Some(Rc::new(RefCell::new(right_node)));
@@ -158,10 +162,6 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             }
         }
 
-        for i in ((child_index as isize)..(node_size as isize - 1isize)).rev() {
-            node_ptr.borrow_mut().elements.swap(i as usize, (i + 1) as usize);
-            node_ptr.borrow_mut().keys.swap(i as usize, (i + 1) as usize);
-        }
         node_ptr.borrow_mut().elements[child_index] = 
             left_node.borrow_mut().elements[Self::MID_INDEX].take();
         node_ptr.borrow_mut().keys[child_index] = 
@@ -175,12 +175,15 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         if left_search {
             index = 0usize;
             let mut current_key = self.keys[index].as_ref().unwrap();
-            while index < self.size && key > current_key {
+            while index < self.size - 1 && key > current_key {
                 index += 1;
                 current_key = self.keys[index].as_ref().unwrap();
             }
+            if key > current_key {
+                index += 1;
+            }
             if index < self.size && key == current_key {
-                let mut element = self.elements[index].as_ref().unwrap().clone();
+                let element = self.elements[index].as_ref().unwrap().clone();
                 element.borrow_mut().counter += 1;
                 return (Some(element), index)
             }
@@ -194,13 +197,13 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             if key > current_key {
                 index += 1;
             } else if key == current_key {
-                let mut element = self.elements[index].as_ref().unwrap().clone();
+                let element = self.elements[index].as_ref().unwrap().clone();
                 element.borrow_mut().counter += 1;
                 return (Some(element), index)
             }
 
             if index < self.size && key == current_key {
-                let mut element = self.elements[index].as_ref().unwrap().clone();
+                let element = self.elements[index].as_ref().unwrap().clone();
                 element.borrow_mut().counter += 1;
                 return (Some(element), index)
             }
