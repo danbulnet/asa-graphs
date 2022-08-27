@@ -1,9 +1,7 @@
 use std::{
     fmt::Display,
-    ptr,
-    mem,
-    rc::{ Rc, Weak },
-    cell::{ RefCell, Ref, RefMut }
+    rc::{ Rc },
+    cell::{ RefCell }
 };
 
 use bionet_common::{
@@ -44,6 +42,9 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
     pub fn new(name: &str) -> ASAGraph<Key, ORDER> {
+        if ORDER < 3 {
+            panic!("Graph order must be >= 3");
+        }
         ASAGraph {
             name: name.to_string(),
             root: Rc::new(RefCell::new(Node::<Key, ORDER>::new(true, None))),
@@ -163,7 +164,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         }
     }
 
-    pub fn print_tree(&self) {
+    pub fn print_graph(&self) {
         let mut height = 0;
         let mut node = self.root.clone();
         let mut queue: Vec<Vec<Rc<RefCell<Node<Key, ORDER>>>>> = vec![vec![]];
@@ -254,12 +255,44 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             }   
         }
     }
+
+    pub fn count_elements_unique(&self) -> usize {
+        let mut counter = 0usize;
+        let mut element = match &self.element_min {
+            Some(e) => e.clone(),
+            None => return counter
+        };
+        loop {
+            counter += 1;
+            let new_element= match &element.borrow().next {
+                Some(e) => e.clone(),
+                None => return counter
+            };
+            element = new_element;
+        }
+    }
+
+    pub fn count_elements_agg(&self) -> usize {
+        let mut counter = 0usize;
+        let mut element = match &self.element_min {
+            Some(e) => e.clone(),
+            None => return counter
+        };
+        loop {
+            counter += element.borrow().counter;
+            let new_element= match &element.borrow().next {
+                Some(e) => e.clone(),
+                None => return counter
+            };
+            element = new_element;
+        }
+    }
 }
 
 #[cfg(test)]
 pub mod tests {
     use rand::Rng;
-    use std::{ io::{self, Write}, time::Instant };
+    use std::{ time::Instant };
     
     use super::ASAGraph;
 
@@ -274,9 +307,9 @@ pub mod tests {
 
         let start = Instant::now();
 
-        let mut graph = ASAGraph::<i32, 3>::new("test");
+        let mut graph = Box::new(ASAGraph::<i32, 3>::new("test"));
 
-        let n = 1_000_000;
+        let n = 1_000;
         for _ in 0..n {
             let number: i32 = rng.gen();
             graph.insert(&number);
@@ -288,19 +321,67 @@ pub mod tests {
     }
 
     #[test]
-    fn print_tree() {
+    fn print_graph() {
         let mut rng = rand::thread_rng();
 
-        let mut graph = ASAGraph::<i32, 3>::new("test");
+        let mut graph = ASAGraph::<i32, 5>::new("test");
 
         for _ in 0..50 {
             let number: i32 = rng.gen_range(1..=20);
             graph.insert(&number);
         }
 
-        io::stdout().flush().unwrap();
-        graph.print_tree();
-        io::stdout().flush().unwrap();
+        graph.print_graph();
+    }
+
+    #[test]
+    fn insert_3_degree() {
+        let mut graph = ASAGraph::<i32, 3>::new("test");
+
+        for i in 1..=250 {
+            graph.insert(&i);
+        }
+
+        for i in (150..=500).rev() {
+            graph.insert(&i);
+        }
+
+        assert_eq!(graph.count_elements_unique(), 500);
+        assert_eq!(graph.count_elements_agg(), 601);
+
+        let root_first_key = graph.root.borrow().elements[0].as_ref().unwrap().borrow().key;
+        assert_eq!(root_first_key, 128);
+        assert_eq!(graph.key_min.unwrap(), 1);
+        assert_eq!(graph.element_min.as_ref().unwrap().borrow().key, 1);
+        assert_eq!(graph.key_max.unwrap(), 500);
+        assert_eq!(graph.element_max.as_ref().unwrap().borrow().key, 500);
+
+        graph.print_graph();
+    }
+
+    #[test]
+    fn insert_25_degree() {
+        let mut graph = ASAGraph::<i32, 25>::new("test");
+
+        for i in 1..=250 {
+            graph.insert(&i);
+        }
+
+        for i in (150..=500).rev() {
+            graph.insert(&i);
+        }
+
+        assert_eq!(graph.count_elements_unique(), 500);
+        assert_eq!(graph.count_elements_agg(), 601);
+
+        let root_first_key = graph.root.borrow().elements[0].as_ref().unwrap().borrow().key;
+        assert_eq!(root_first_key, 169);
+        assert_eq!(graph.key_min.unwrap(), 1);
+        assert_eq!(graph.element_min.as_ref().unwrap().borrow().key, 1);
+        assert_eq!(graph.key_max.unwrap(), 500);
+        assert_eq!(graph.element_max.as_ref().unwrap().borrow().key, 500);
+
+        graph.print_graph();
     }
 
     #[test]
@@ -313,38 +394,78 @@ pub mod tests {
         }
 
         for i in 0..n {
-            assert!(graph.search(&i).is_some());
+            let result = graph.search(&i);
+            assert!(result.is_some());
+            assert_eq!(result.unwrap().borrow().key, i);
         }
         
         assert!(graph.search(&101).is_none());
         assert!(graph.search(&-1).is_none());
     }
 
-    // #[test]
-    // fn test_connections() {
-    //     let mut prev_element;
-    //     let mut current_element = left_left_child.borrow().elements[0].as_ref().unwrap().clone();
-    //     for i in 1..=7 {
-    //         println!("\n{i}-th element: {}", current_element.borrow());
-    //         assert_eq!(current_element.borrow().key, i);
-    //         {
-    //             let prev = &current_element.borrow().prev;
-    //             let next = &current_element.borrow().next;
-    //             println!("\n{i}-th next element: {}", next.as_ref().unwrap().borrow());
-    //             if i == 1 { 
-    //                 assert!(prev.is_none());
-    //                 assert_eq!(next.as_ref().unwrap().borrow().key, 2);
-    //             } else if i == 7 {
-    //                 assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, 6);
-    //                 assert!(next.is_none());
-    //                 break
-    //             } else {
-    //                 assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, i - 1);
-    //                 assert_eq!(next.as_ref().unwrap().borrow().key, i + 1);
-    //             }
-    //         }
-    //         prev_element = current_element.clone();
-    //         current_element = prev_element.borrow().next.as_ref().unwrap().clone();
-    //     }
-    // }
+    #[test]
+    fn test_connections() {
+        let mut graph = ASAGraph::<i32, 3>::new("test");
+    
+        let n = 50;
+        for i in 1..=n {
+            graph.insert(&i);
+        }
+
+        let mut prev_element;
+        let mut current_element = graph.element_min.as_ref().unwrap().clone();
+        for i in 1..=n {
+            assert_eq!(current_element.borrow().key, i);
+            {
+                let prev = &current_element.borrow().prev;
+                let next = &current_element.borrow().next;
+                if i == 1 { 
+                    assert!(prev.is_none());
+                    assert_eq!(next.as_ref().unwrap().borrow().key, 2);
+                } else if i == n {
+                    assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, n - 1);
+                    assert!(next.is_none());
+                    break
+                } else {
+                    assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, i - 1);
+                    assert_eq!(next.as_ref().unwrap().borrow().key, i + 1);
+                }
+            }
+            prev_element = current_element.clone();
+            current_element = prev_element.borrow().next.as_ref().unwrap().clone();
+        }
+    }
+
+    #[test]
+    fn test_connections_rev() {
+        let mut graph = ASAGraph::<i32, 3>::new("test");
+    
+        let n = 50;
+        for i in (1..=n).rev() {
+            graph.insert(&i);
+        }
+
+        let mut prev_element;
+        let mut current_element = graph.element_min.as_ref().unwrap().clone();
+        for i in 1..=n {
+            assert_eq!(current_element.borrow().key, i);
+            {
+                let prev = &current_element.borrow().prev;
+                let next = &current_element.borrow().next;
+                if i == 1 { 
+                    assert!(prev.is_none());
+                    assert_eq!(next.as_ref().unwrap().borrow().key, 2);
+                } else if i == n {
+                    assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, n - 1);
+                    assert!(next.is_none());
+                    break
+                } else {
+                    assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, i - 1);
+                    assert_eq!(next.as_ref().unwrap().borrow().key, i + 1);
+                }
+            }
+            prev_element = current_element.clone();
+            current_element = prev_element.borrow().next.as_ref().unwrap().clone();
+        }
+    }
 }

@@ -352,8 +352,6 @@ mod tests {
         root.borrow().insert_existing_key(&2, false);
         root.borrow().insert_existing_key(&3, false);
        
-        println!("\ninsert_into_leaf {}", &root.borrow());
-
         assert!(root.borrow().size == 3);
         assert_eq!(root.borrow().keys[0].unwrap(), -1);
         assert_eq!(root.borrow().keys[1].unwrap(), 1);
@@ -494,7 +492,5 @@ mod tests {
         assert_eq!(left_right_child.borrow().elements[0].as_ref().unwrap().borrow().key, 3);
         assert_eq!(right_left_child.borrow().elements[0].as_ref().unwrap().borrow().key, 5);
         assert_eq!(right_right_child.borrow().elements[0].as_ref().unwrap().borrow().key, 7);
-
-        println!("\nroot_newer: {}", &root_newer.borrow());
     }
 }
