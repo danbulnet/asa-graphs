@@ -34,10 +34,25 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
 
     fn new(name: &str) -> ASAGraph<Key, ORDER> { Self::new(name) }
 
-    fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> { self.search(key) }
-
     fn insert(&mut self, key: &Key) -> Rc<RefCell<Element<Key, ORDER>>> {
         self.insert(key)
+    }
+
+    fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> { self.search(key) }
+
+    fn stimulate(
+        &mut self, 
+        item: &Key, 
+        signal: f32, 
+        propagate_horizontal: bool, 
+        propagate_vertical: bool
+    ) -> Rc<RefCell<Element<Key, ORDER>>> {
+        let element = match self.search(item) {
+            Some(element_ptr) => element_ptr,
+            None => self.insert(item)
+        };
+        element.borrow_mut().activation += signal;
+        element
     }
 }
 

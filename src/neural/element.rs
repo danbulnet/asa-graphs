@@ -5,7 +5,8 @@ use std::{
 };
 
 use bionet_common::{
-    distances::Distance
+    distances::Distance,
+    neuron::{ Neuron, NeuronID }
 };
 
 use super::{
@@ -63,6 +64,25 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
 
     pub unsafe fn get_parent_ptr(&self) -> Option<*mut ASAGraph<Key, ORDER>> {
         if self.parent.is_null() { None } else { Some(self.parent) }
+    }
+}
+
+impl<Key, const ORDER: usize> Neuron for Element<Key, ORDER> 
+where Key: Clone + Display + Distance + PartialOrd + PartialEq, [(); ORDER + 1]: {
+    fn get_id(&self) -> NeuronID {
+        NeuronID {
+            id: format!("{}", self.key),
+            parent_id: unsafe { (&*self.parent).name.clone() }
+        }
+    }
+
+    fn activation(&self) -> f32 { self.activation }
+
+    fn stimulate(
+        &mut self, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
+    ) -> f32 {
+        self.activation += signal;
+        self.activation
     }
 }
 
