@@ -1,7 +1,7 @@
 use std::{
     fmt::Display,
-    rc::{ Rc },
-    cell::{ RefCell }
+    rc::Rc,
+    cell::RefCell
 };
 
 use bionet_common::{
@@ -9,7 +9,7 @@ use bionet_common::{
     distances::Distance
 };
 
-use crate::{
+use super::{
     element::Element,
     node::Node
 };

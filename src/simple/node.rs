@@ -1,5 +1,4 @@
 use std::{
-    ptr,
     fmt::{ Display, Formatter, Result },
     rc::{ Rc, Weak },
     cell::{ RefCell, Ref, RefMut }
@@ -10,10 +9,7 @@ use bionet_common::{
     algorithms::SearchAlgorithm
 };
 
-use crate::{
-    element::Element,
-    graph::ASAGraph
-};
+use super::element::Element;
 
 #[derive(Clone, Debug)]
 pub struct Node<Key, const ORDER: usize>
@@ -212,9 +208,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     }
 
     pub(crate) fn insert_key_leaf(
-        node: &Rc<RefCell<Node<Key, ORDER>>>, 
-        key: &Key, 
-        parent: *mut ASAGraph<Key, ORDER>
+        node: &Rc<RefCell<Node<Key, ORDER>>>, key: &Key
     ) -> Rc<RefCell<Element<Key, ORDER>>> {
         let node_size = node.borrow().size;
 
@@ -236,7 +230,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             index += 1;
         }
         
-        let new_element = Rc::new(RefCell::new(Element::new(key, parent)));
+        let new_element = Rc::new(RefCell::new(Element::new(key)));
         node.borrow_mut().elements[index] = Some(new_element.clone());
         node.borrow_mut().keys[index] = Some(key.clone());
 
@@ -321,7 +315,7 @@ mod tests {
         cell::RefCell
     };
 
-    use crate::{
+    use super::super::{
         node::Node,
         element::Element,
         graph::ASAGraph
@@ -340,13 +334,13 @@ mod tests {
         let root: &Rc<RefCell<Node<i32, 3>>> = &graph.borrow().root;
 
         root.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&2, graph.as_ptr())))
+            Rc::new(RefCell::new(Element::new(&2)))
         );
         root.borrow_mut().keys[0] = Some(2);
         root.borrow_mut().size = 1;
 
-        Node::insert_key_leaf(&root, &-1, graph.as_ptr());
-        Node::insert_key_leaf(&root, &1, graph.as_ptr());
+        Node::insert_key_leaf(&root, &-1);
+        Node::insert_key_leaf(&root, &1);
         root.borrow().insert_existing_key(&1, true);
         root.borrow().insert_existing_key(&-1, true);
         root.borrow().insert_existing_key(&2, true);
@@ -370,13 +364,13 @@ mod tests {
         let root: &Rc<RefCell<Node<i32, 3>>> = &graph.borrow().root;
 
         root.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&1, graph.as_ptr())))
+            Rc::new(RefCell::new(Element::new(&1)))
         );
         root.borrow_mut().keys[0] = Some(1);
         root.borrow_mut().size = 1;
 
-        Node::insert_key_leaf(&root, &6, graph.as_ptr());
-        Node::insert_key_leaf(&root, &7, graph.as_ptr());
+        Node::insert_key_leaf(&root, &6);
+        Node::insert_key_leaf(&root, &7);
 
         let root_new = Rc::new(RefCell::new(Node::new(false, None)));
         root_new.borrow_mut().children[0] = Some(root.clone());
@@ -404,14 +398,14 @@ mod tests {
         assert!(root_new.borrow().children[0].as_ref().unwrap().borrow().elements[1].is_none());
         assert!(root_new.borrow().children[1].as_ref().unwrap().borrow().elements[1].is_none());
 
-        Node::insert_key_leaf(&root_new, &2, graph.as_ptr());
-        Node::insert_key_leaf(&root_new, &4, graph.as_ptr());
+        Node::insert_key_leaf(&root_new, &2);
+        Node::insert_key_leaf(&root_new, &4);
 
         let middle_left_node = Rc::new(
             RefCell::new(Node::new(true, Some(Rc::downgrade(&root_new))))
         );
         middle_left_node.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&3, graph.as_ptr())))
+            Rc::new(RefCell::new(Element::new(&3)))
         );
         middle_left_node.borrow_mut().keys[0] = Some(3);
         middle_left_node.borrow_mut().size = 1;
@@ -420,7 +414,7 @@ mod tests {
             RefCell::new(Node::new(true, Some(Rc::downgrade(&root_new))))
         );
         middle_right_node.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&5, graph.as_ptr())))
+            Rc::new(RefCell::new(Element::new(&5)))
         );
         middle_right_node.borrow_mut().keys[0] = Some(5);
         middle_right_node.borrow_mut().size = 1;

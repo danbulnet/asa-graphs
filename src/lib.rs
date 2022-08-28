@@ -3,9 +3,8 @@
 
 #![allow(dead_code)] // TODO: remove after dev is done
 
-pub mod graph;
-mod node;
-mod element;
+pub mod simple;
+pub mod neural;
 
 #[cfg(test)]
 mod tests {

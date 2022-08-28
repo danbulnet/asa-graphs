@@ -1,15 +1,14 @@
 use std::{
     fmt::{ Display, Formatter, Result },
     rc::{ Rc, Weak },
-    cell::RefCell,
-    ptr
+    cell::RefCell
 };
 
 use bionet_common::{
     distances::Distance
 };
 
-use crate::{
+use super::{
     graph::ASAGraph
 };
 
@@ -18,6 +17,7 @@ pub struct Element<Key, const ORDER: usize>
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
     pub key: Key,
     pub counter: usize,
+    pub activation: f32,
     pub(crate) next: Option<Weak<RefCell<Element<Key, ORDER>>>>,
     pub(crate) prev: Option<Weak<RefCell<Element<Key, ORDER>>>>,
     pub(crate) parent: *mut ASAGraph<Key, ORDER>
@@ -29,9 +29,10 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     -> Element<Key, ORDER> {
         Element {
             key: key.clone(),
+            counter: 1,
+            activation: 0.0f32,
             next: None,
             prev: None,
-            counter: 1,
             parent
         }
     }
@@ -79,9 +80,7 @@ mod tests {
         cell::RefCell
     };
 
-    use bionet_common::sensor::Sensor;
-
-    use crate::{
+    use super::super::{
         element::Element,
         graph::ASAGraph
     };
