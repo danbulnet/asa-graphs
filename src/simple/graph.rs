@@ -4,10 +4,7 @@ use std::{
     cell::RefCell
 };
 
-use bionet_common::{
-    sensor::Sensor,
-    distances::Distance
-};
+use bionet_common::distances::Distance;
 
 use super::{
     element::Element,
@@ -23,22 +20,6 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     pub(crate) element_max: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub key_min: Option<Key>,
     pub key_max: Option<Key>
-}
-
-impl<Key, const ORDER: usize> Sensor for ASAGraph<Key, ORDER> 
-where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
-    type ElementType = Element<Key, ORDER>;
-    type DataType = Key;
-
-    fn name(&self) -> &str { &self.name }
-
-    fn new(name: &str) -> ASAGraph<Key, ORDER> { Self::new(name) }
-
-    fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> { self.search(key) }
-
-    fn insert(&mut self, key: &Key) -> Rc<RefCell<Element<Key, ORDER>>> {
-        self.insert(key)
-    }
 }
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
