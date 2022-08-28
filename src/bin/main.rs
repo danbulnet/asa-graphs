@@ -13,8 +13,8 @@ fn main() {
 
     let mut graph = ASAGraph::<i32, 3>::new("test");
 
-    for _i in 0..1128 {
-        let number = rng.gen_range(0..28);
+    for _i in 0..10_000 {
+        let number = rng.gen_range(0..58);
         graph.insert(&number);
     }
 

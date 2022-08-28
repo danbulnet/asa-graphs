@@ -254,7 +254,10 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             } else {
                 if let Some(prev) = node.borrow().elements[index - 1].as_ref() {
                     prev_ptr = Some(prev.clone());
-                    next_ptr = prev.as_ref().borrow().next.clone();
+                    next_ptr = match prev.as_ref().borrow().next.as_ref() {
+                        Some(e) => Some(e.upgrade().unwrap().clone()),
+                        None => None
+                    };
                 }
             }
         }

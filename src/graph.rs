@@ -267,7 +267,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         loop {
             counter += 1;
             let new_element= match &element.borrow().next {
-                Some(e) => e.clone(),
+                Some(e) => e.upgrade().unwrap().clone(),
                 None => return counter
             };
             element = new_element;
@@ -283,7 +283,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         loop {
             counter += element.borrow().counter;
             let new_element= match &element.borrow().next {
-                Some(e) => e.clone(),
+                Some(e) => e.upgrade().unwrap().clone(),
                 None => return counter
             };
             element = new_element;
@@ -423,18 +423,18 @@ pub mod tests {
                 let next = &current_element.borrow().next;
                 if i == 1 { 
                     assert!(prev.is_none());
-                    assert_eq!(next.as_ref().unwrap().borrow().key, 2);
+                    assert_eq!(next.as_ref().unwrap().upgrade().unwrap().borrow().key, 2);
                 } else if i == n {
                     assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, n - 1);
                     assert!(next.is_none());
                     break
                 } else {
                     assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, i - 1);
-                    assert_eq!(next.as_ref().unwrap().borrow().key, i + 1);
+                    assert_eq!(next.as_ref().unwrap().upgrade().unwrap().borrow().key, i + 1);
                 }
             }
             prev_element = current_element.clone();
-            current_element = prev_element.borrow().next.as_ref().unwrap().clone();
+            current_element = prev_element.borrow().next.as_ref().unwrap().upgrade().unwrap().clone();
         }
     }
 
@@ -456,18 +456,18 @@ pub mod tests {
                 let next = &current_element.borrow().next;
                 if i == 1 { 
                     assert!(prev.is_none());
-                    assert_eq!(next.as_ref().unwrap().borrow().key, 2);
+                    assert_eq!(next.as_ref().unwrap().upgrade().unwrap().borrow().key, 2);
                 } else if i == n {
                     assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, n - 1);
                     assert!(next.is_none());
                     break
                 } else {
                     assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, i - 1);
-                    assert_eq!(next.as_ref().unwrap().borrow().key, i + 1);
+                    assert_eq!(next.as_ref().unwrap().upgrade().unwrap().borrow().key, i + 1);
                 }
             }
             prev_element = current_element.clone();
-            current_element = prev_element.borrow().next.as_ref().unwrap().clone();
+            current_element = prev_element.borrow().next.as_ref().unwrap().upgrade().unwrap().clone();
         }
     }
 }
