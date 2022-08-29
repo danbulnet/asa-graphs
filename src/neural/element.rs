@@ -9,24 +9,20 @@ use bionet_common::{
     neuron::{ Neuron, NeuronID }
 };
 
-use super::{
-    graph::ASAGraph
-};
-
 #[derive(Clone, Debug)]
 pub struct Element<Key, const ORDER: usize>
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
     pub key: Key,
     pub counter: usize,
     pub activation: f32,
+    pub parent: Rc<str>,
     pub(crate) next: Option<Weak<RefCell<Element<Key, ORDER>>>>,
     pub(crate) prev: Option<Weak<RefCell<Element<Key, ORDER>>>>,
-    pub(crate) parent: *mut ASAGraph<Key, ORDER>
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:  {
-    pub fn new(key: &Key, parent: *mut ASAGraph<Key, ORDER>)
+    pub fn new(key: &Key, parent: &Rc<str>)
     -> Element<Key, ORDER> {
         Element {
             key: key.clone(),
@@ -34,7 +30,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             activation: 0.0f32,
             next: None,
             prev: None,
-            parent
+            parent: parent.clone()
         }
     }
 
@@ -61,10 +57,6 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             element.next = None; 
         }
     }
-
-    pub unsafe fn get_parent_ptr(&self) -> Option<*mut ASAGraph<Key, ORDER>> {
-        if self.parent.is_null() { None } else { Some(self.parent) }
-    }
 }
 
 impl<Key, const ORDER: usize> Neuron for Element<Key, ORDER> 
@@ -72,7 +64,7 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq, [(); ORDER + 1]:
     fn id(&self) -> NeuronID {
         NeuronID {
             id: format!("{}", self.key),
-            parent_id: unsafe { (&*self.parent).name.clone() }
+            parent_id: self.parent.to_string()
         }
     }
 
@@ -112,11 +104,11 @@ mod tests {
     #[test]
     fn set_connections() {
         let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
-        let graph_ptr = &mut *graph.borrow_mut() as *mut ASAGraph<i32, 3>;
+        let graph_name = &graph.borrow().name;
 
-        let element_1_ptr = Rc::new(RefCell::new(Element::new(&1, graph_ptr)));
-        let element_2_ptr = Rc::new(RefCell::new(Element::new(&2, graph_ptr)));
-        let element_3_ptr = Rc::new(RefCell::new(Element::new(&3, graph_ptr)));
+        let element_1_ptr: Rc<RefCell<Element<i32, 3>>> = Rc::new(RefCell::new(Element::new(&1, graph_name)));
+        let element_2_ptr: Rc<RefCell<Element<i32, 3>>> = Rc::new(RefCell::new(Element::new(&2, graph_name)));
+        let element_3_ptr: Rc<RefCell<Element<i32, 3>>> = Rc::new(RefCell::new(Element::new(&3, graph_name)));
 
         assert!(element_1_ptr.borrow().prev.is_none());
         assert!(element_1_ptr.borrow().next.is_none());
@@ -169,11 +161,10 @@ mod tests {
     #[test]
     fn parent_name() {
         let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
-        let graph_ptr = &mut *graph.borrow_mut() as *mut ASAGraph<i32, 3>;
+        let graph_name_ptr = &graph.borrow().name;
 
-        let element_1_ptr = Rc::new(RefCell::new(Element::new(&1, graph_ptr)));
-        let parent_ptr = unsafe { element_1_ptr.borrow().get_parent_ptr() };
-        let parent_name = unsafe { (&*parent_ptr.unwrap()).name.clone() };
+        let element_1_ptr: Rc<RefCell<Element<i32, 3>>> = Rc::new(RefCell::new(Element::new(&1, graph_name_ptr)));
+        let parent_name = &*element_1_ptr.borrow().parent;
         assert_eq!(parent_name, "test");
     }
 }

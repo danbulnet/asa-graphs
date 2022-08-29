@@ -213,7 +213,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     pub(crate) fn insert_key_leaf(
         node: &Rc<RefCell<Node<Key, ORDER>>>, 
         key: &Key, 
-        parent: *mut ASAGraph<Key, ORDER>
+        parent: &Rc<str>
     ) -> Rc<RefCell<Element<Key, ORDER>>> {
         let node_size = node.borrow().size;
 
@@ -337,15 +337,16 @@ mod tests {
     fn insert_into_leaf() {
         let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
         let root: &Rc<RefCell<Node<i32, 3>>> = &graph.borrow().root;
+        let graph_name = &graph.borrow().name;
 
         root.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&2, graph.as_ptr())))
+            Rc::new(RefCell::new(Element::new(&2, graph_name)))
         );
         root.borrow_mut().keys[0] = Some(2);
         root.borrow_mut().size = 1;
 
-        Node::insert_key_leaf(&root, &-1, graph.as_ptr());
-        Node::insert_key_leaf(&root, &1, graph.as_ptr());
+        Node::insert_key_leaf(&root, &-1, graph_name);
+        Node::insert_key_leaf(&root, &1, graph_name);
         root.borrow().insert_existing_key(&1, true);
         root.borrow().insert_existing_key(&-1, true);
         root.borrow().insert_existing_key(&2, true);
@@ -367,15 +368,16 @@ mod tests {
     fn split_node() {
         let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
         let root: &Rc<RefCell<Node<i32, 3>>> = &graph.borrow().root;
+        let graph_name = &graph.borrow().name;
 
         root.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&1, graph.as_ptr())))
+            Rc::new(RefCell::new(Element::new(&1, graph_name)))
         );
         root.borrow_mut().keys[0] = Some(1);
         root.borrow_mut().size = 1;
 
-        Node::insert_key_leaf(&root, &6, graph.as_ptr());
-        Node::insert_key_leaf(&root, &7, graph.as_ptr());
+        Node::insert_key_leaf(&root, &6, graph_name);
+        Node::insert_key_leaf(&root, &7, graph_name);
 
         let root_new = Rc::new(RefCell::new(Node::new(false, None)));
         root_new.borrow_mut().children[0] = Some(root.clone());
@@ -403,14 +405,14 @@ mod tests {
         assert!(root_new.borrow().children[0].as_ref().unwrap().borrow().elements[1].is_none());
         assert!(root_new.borrow().children[1].as_ref().unwrap().borrow().elements[1].is_none());
 
-        Node::insert_key_leaf(&root_new, &2, graph.as_ptr());
-        Node::insert_key_leaf(&root_new, &4, graph.as_ptr());
+        Node::insert_key_leaf(&root_new, &2, graph_name);
+        Node::insert_key_leaf(&root_new, &4, graph_name);
 
         let middle_left_node = Rc::new(
             RefCell::new(Node::new(true, Some(Rc::downgrade(&root_new))))
         );
         middle_left_node.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&3, graph.as_ptr())))
+            Rc::new(RefCell::new(Element::new(&3, graph_name)))
         );
         middle_left_node.borrow_mut().keys[0] = Some(3);
         middle_left_node.borrow_mut().size = 1;
@@ -419,7 +421,7 @@ mod tests {
             RefCell::new(Node::new(true, Some(Rc::downgrade(&root_new))))
         );
         middle_right_node.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&5, graph.as_ptr())))
+            Rc::new(RefCell::new(Element::new(&5, graph_name)))
         );
         middle_right_node.borrow_mut().keys[0] = Some(5);
         middle_right_node.borrow_mut().size = 1;

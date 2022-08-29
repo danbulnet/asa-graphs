@@ -17,7 +17,7 @@ use super::{
 #[derive(Clone, Debug)]
 pub struct ASAGraph<Key, const ORDER: usize = 25>
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
-    pub name: String,
+    pub name: Rc<str>,
     pub root: Rc<RefCell<Node<Key, ORDER>>>,
     pub(crate) element_min: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub(crate) element_max: Option<Rc<RefCell<Element<Key, ORDER>>>>,
@@ -30,7 +30,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     type ElementType = Element<Key, ORDER>;
     type DataType = Key;
 
-    fn name(&self) -> &str { &self.name }
+    fn name(&self) -> &str { &*self.name }
 
     fn new(name: &str) -> ASAGraph<Key, ORDER> { Self::new(name) }
 
@@ -63,7 +63,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             panic!("Graph order must be >= 3");
         }
         ASAGraph {
-            name: name.to_string(),
+            name: Rc::from(name),
             root: Rc::new(RefCell::new(Node::<Key, ORDER>::new(true, None))),
             element_min: None,
             element_max: None,
@@ -160,9 +160,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             let mut index = node_insert_result.1;
     
             if node.borrow().is_leaf {
-                let element = Node::insert_key_leaf(
-                    &node, key, self as *mut ASAGraph<Key, ORDER>
-                );
+                let element = Node::insert_key_leaf(&node, key, &self.name);
                 self.set_extrema(&element);
                 return element
             } else {
@@ -226,7 +224,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         &mut self, node: &Rc<RefCell<Node<Key, ORDER>>>,  key: &Key
     ) -> Rc<RefCell<Element<Key, ORDER>>> {
         let element_pointer = Rc::new(
-            RefCell::new(Element::<Key, ORDER>::new(key, self as *mut ASAGraph<Key, ORDER>))
+            RefCell::new(Element::<Key, ORDER>::new(key, &self.name))
         );
         node.borrow_mut().elements[0] = Some(element_pointer.clone());
         node.borrow_mut().keys[0] = Some(key.clone());
