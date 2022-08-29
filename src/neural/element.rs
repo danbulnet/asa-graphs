@@ -63,8 +63,8 @@ impl<Key, const ORDER: usize> Neuron for Element<Key, ORDER>
 where Key: Clone + Display + Distance + PartialOrd + PartialEq, [(); ORDER + 1]: {
     fn id(&self) -> NeuronID {
         NeuronID {
-            id: format!("{}", self.key),
-            parent_id: self.parent.to_string()
+            id: Rc::from(self.key.to_string()),
+            parent_id: self.parent.clone()
         }
     }
 
