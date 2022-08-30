@@ -96,6 +96,10 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
 
         let mut activated_neurons = Vec::new();
 
+        if propagate_horizontal {
+            // TODO
+        }
+
         if propagate_vertical {
             for e in &self.definitions {
                 let to = e.borrow().to().clone();
@@ -112,6 +116,10 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
 
     fn deactivate(&mut self, propagate_horizontal: bool, propagate_vertical: bool) {
         self.activation = 0.0f32;
+
+        if propagate_horizontal {
+            // TODO
+        }
 
         if propagate_vertical {
             for e in &self.definitions {
@@ -160,7 +168,8 @@ mod tests {
 
     use bionet_common::{
         neuron::{ Neuron, NeuronConnect },
-        connection::ConnectionKind
+        connection::ConnectionKind,
+        data::DataCategory
     };
 
     use super::super::{
@@ -170,7 +179,7 @@ mod tests {
 
     #[test]
     fn set_connections() {
-        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
+        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical)));
         let graph_name = &graph.borrow().name;
 
         let element_1_ptr: Rc<RefCell<Element<i32, 3>>> = Element::new(&1, graph_name);
@@ -227,7 +236,7 @@ mod tests {
 
     #[test]
     fn parent_name() {
-        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
+        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical)));
         let graph_name_ptr = &graph.borrow().name;
 
         let element_1_ptr: Rc<RefCell<Element<i32, 3>>> = Element::new(&1, graph_name_ptr);
@@ -237,7 +246,7 @@ mod tests {
 
     #[test]
     fn as_neuron() {
-        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
+        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical)));
         let graph_name = &graph.borrow().name;
 
         let element_1_ptr: Rc<RefCell<Element<i32, 3>>> = Element::new(&1, graph_name);

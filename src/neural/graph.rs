@@ -1,12 +1,14 @@
 use std::{
     fmt::Display,
     rc::Rc,
-    cell::RefCell
+    cell::{RefCell, Ref}
 };
 
 use bionet_common::{
     sensor::Sensor,
-    distances::Distance
+    distances::Distance,
+    connection::Connection,
+    neuron::{ Neuron, NeuronConnect }, data::DataCategory
 };
 
 use super::{
@@ -17,7 +19,8 @@ use super::{
 pub struct ASAGraph<Key, const ORDER: usize = 25>
 where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
     pub name: Rc<str>,
-    pub root: Rc<RefCell<Node<Key, ORDER>>>,
+    pub data_category: DataCategory,
+    pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
     pub(crate) element_min: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub(crate) element_max: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub key_min: Option<Key>,
@@ -25,13 +28,17 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
 }
 
 impl<Key, const ORDER: usize> Sensor for ASAGraph<Key, ORDER> 
-where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
+where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
     type ElementType = Element<Key, ORDER>;
     type DataType = Key;
 
     fn name(&self) -> &str { &*self.name }
 
-    fn new(name: &str) -> ASAGraph<Key, ORDER> { Self::new(name) }
+    fn data_category(&self) -> DataCategory { self.data_category }
+
+    fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> { 
+        Self::new(name, data_category)
+    }
 
     fn insert(&mut self, key: &Key) -> Rc<RefCell<Element<Key, ORDER>>> {
         self.insert(key)
@@ -39,30 +46,128 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
 
     fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> { self.search(key) }
 
-    fn stimulate(
-        &mut self, 
-        item: &Key, 
-        signal: f32, 
-        propagate_horizontal: bool, 
-        propagate_vertical: bool
-    ) -> Rc<RefCell<Element<Key, ORDER>>> {
+    fn activate(
+        &mut self, item: &Key, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
+    ) -> Result<Vec<Rc<RefCell<dyn Neuron>>>, String> {
+        let mut activated_neurons = Vec::new();
+
         let element = match self.search(item) {
-            Some(element_ptr) => element_ptr,
-            None => self.insert(item)
+            Some(e) => e,
+            None => { 
+                match self.data_category {
+                    DataCategory::Categorical => {
+                        log::error!("activating missing categorical sensory neuron {}", item);
+                        return Err(
+                            format!("activating missing categorical sensory neuron {}", item)
+                        )
+                    },
+                    DataCategory::Numerical | DataCategory::Ordinal => {
+                        if propagate_horizontal {
+                            log::warn!(
+                                "activating missing non-categorical sensory neuron {}, inserting",
+                                item
+                            );
+                            self.insert(&item)
+                        } else {
+                            log::error!(
+                                "activating missing non-categorical sensory neuron {} with {}",
+                                item, "propagate_horizontal=false"
+                            );
+                            return Err(format!(
+                                "activating missing non-categorical sensory neuron {} with {}",
+                                item, "propagate_horizontal=false"
+                            ))
+                        }
+                    }
+                }
+            }
         };
+        
         element.borrow_mut().activation += signal;
-        element
+
+        if propagate_horizontal {
+            // TODO
+        }
+
+        if propagate_vertical {
+            for e in &element.borrow().definitions {
+                let to = e.borrow().to().clone();
+                let is_sensor = to.borrow().is_sensor();
+                to.borrow_mut().activate(
+                    element.borrow().activation, propagate_horizontal, !is_sensor
+                );
+                activated_neurons.push(to);
+            }
+        }
+
+        Ok(activated_neurons)
+    }
+
+    fn deactivate(
+        &mut self, item: &Self::DataType, propagate_horizontal: bool, propagate_vertical: bool
+    ) -> Result<(), String> {
+        let element = match self.search(item) {
+            Some(e) => e,
+            None => {
+                log::error!("deactivating non-existing sensory neuron {}", item);
+                return Err(format!("deactivating non-existing sensory neuron {}", item))
+            }
+        };
+
+        let mut connected_neurons: Vec<Rc<RefCell<dyn Neuron>>> = Vec::new();
+
+        if propagate_vertical {
+            for e in &element.borrow().definitions {
+                let to = e.borrow().to().clone();
+                let is_sensor = to.borrow().is_sensor();
+                to.borrow_mut().deactivate(propagate_horizontal, !is_sensor);
+                connected_neurons.push(to);
+            }
+        }
+
+        if propagate_horizontal {
+            // TODO
+        }
+
+        if propagate_vertical {
+            for neuron in &connected_neurons {
+                let is_sensor = neuron.borrow().is_sensor();
+                neuron.borrow_mut().deactivate(!is_sensor, !is_sensor);
+            }
+        }
+        Ok(())
+    }
+
+    fn deactivate_sensor(&mut self) {
+        let mut element = match &self.element_min {
+            Some(e) => e.clone(),
+            None => { log::warn!("no element_min in asa-graph"); return }
+        };
+
+        let mut counter = 0;
+        loop {
+            element.borrow_mut().deactivate(false, false);
+            counter += 1;
+
+            let new_element= match &element.borrow().next {
+                Some(e) => e.upgrade().unwrap().clone(),
+                None => break
+            };
+            element = new_element;
+        }
+        log::info!("deactivated {counter} neurons for sensor {}", self.name());
     }
 }
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
-    pub fn new(name: &str) -> ASAGraph<Key, ORDER> {
+    pub fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");
         }
         ASAGraph {
             name: Rc::from(name),
+            data_category,
             root: Rc::new(RefCell::new(Node::<Key, ORDER>::new(true, None))),
             element_min: None,
             element_max: None,
@@ -305,12 +410,14 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
 pub mod tests {
     use rand::Rng;
     use std::{ time::Instant };
+
+    use bionet_common::data::DataCategory;
     
     use super::ASAGraph;
 
     #[test]
     fn create_empty_graph() {
-        ASAGraph::<i32, 3>::new("test");
+        ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
     }
 
     #[test]
@@ -319,7 +426,7 @@ pub mod tests {
 
         let start = Instant::now();
 
-        let mut graph = Box::new(ASAGraph::<i32, 3>::new("test"));
+        let mut graph = Box::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical));
 
         let n = 1_000;
         for _ in 0..n {
@@ -336,7 +443,7 @@ pub mod tests {
     fn print_graph() {
         let mut rng = rand::thread_rng();
 
-        let mut graph = ASAGraph::<i32, 5>::new("test");
+        let mut graph = ASAGraph::<i32, 5>::new("test", DataCategory::Numerical);
 
         for _ in 0..50 {
             let number: i32 = rng.gen_range(1..=20);
@@ -348,7 +455,7 @@ pub mod tests {
 
     #[test]
     fn insert_3_degree() {
-        let mut graph = ASAGraph::<i32, 3>::new("test");
+        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
 
         for i in 1..=250 {
             graph.insert(&i);
@@ -373,7 +480,7 @@ pub mod tests {
 
     #[test]
     fn insert_25_degree() {
-        let mut graph = ASAGraph::<i32, 25>::new("test");
+        let mut graph = ASAGraph::<i32, 25>::new("test", DataCategory::Numerical);
 
         for i in 1..=250 {
             graph.insert(&i);
@@ -398,7 +505,7 @@ pub mod tests {
 
     #[test]
     fn search() {
-        let mut graph = ASAGraph::<i32, 3>::new("test");
+        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
 
         let n = 100;
         for i in 0..n {
@@ -417,7 +524,7 @@ pub mod tests {
 
     #[test]
     fn test_connections() {
-        let mut graph = ASAGraph::<i32, 3>::new("test");
+        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
     
         let n = 50;
         for i in 1..=n {
@@ -450,7 +557,7 @@ pub mod tests {
 
     #[test]
     fn test_connections_rev() {
-        let mut graph = ASAGraph::<i32, 3>::new("test");
+        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
     
         let n = 50;
         for i in (1..=n).rev() {
