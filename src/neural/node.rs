@@ -9,12 +9,8 @@ use bionet_common::{
     algorithms::SearchAlgorithm
 };
 
-use super::{
-    element::Element,
-    graph::ASAGraph
-};
+use super::element::Element;
 
-#[derive(Clone, Debug)]
 pub struct Node<Key, const ORDER: usize>
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
     pub(crate) size: usize,
@@ -235,7 +231,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             index += 1;
         }
         
-        let new_element = Rc::new(RefCell::new(Element::new(key, parent)));
+        let new_element = Element::new(key, parent);
         node.borrow_mut().elements[index] = Some(new_element.clone());
         node.borrow_mut().keys[index] = Some(key.clone());
 
@@ -339,9 +335,7 @@ mod tests {
         let root: &Rc<RefCell<Node<i32, 3>>> = &graph.borrow().root;
         let graph_name = &graph.borrow().name;
 
-        root.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&2, graph_name)))
-        );
+        root.borrow_mut().elements[0] = Some(Element::new(&2, graph_name));
         root.borrow_mut().keys[0] = Some(2);
         root.borrow_mut().size = 1;
 
@@ -370,9 +364,7 @@ mod tests {
         let root: &Rc<RefCell<Node<i32, 3>>> = &graph.borrow().root;
         let graph_name = &graph.borrow().name;
 
-        root.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&1, graph_name)))
-        );
+        root.borrow_mut().elements[0] = Some(Element::new(&1, graph_name));
         root.borrow_mut().keys[0] = Some(1);
         root.borrow_mut().size = 1;
 
@@ -411,18 +403,14 @@ mod tests {
         let middle_left_node = Rc::new(
             RefCell::new(Node::new(true, Some(Rc::downgrade(&root_new))))
         );
-        middle_left_node.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&3, graph_name)))
-        );
+        middle_left_node.borrow_mut().elements[0] = Some(Element::new(&3, graph_name));
         middle_left_node.borrow_mut().keys[0] = Some(3);
         middle_left_node.borrow_mut().size = 1;
 
         let middle_right_node = Rc::new(
             RefCell::new(Node::new(true, Some(Rc::downgrade(&root_new))))
         );
-        middle_right_node.borrow_mut().elements[0] = Some(
-            Rc::new(RefCell::new(Element::new(&5, graph_name)))
-        );
+        middle_right_node.borrow_mut().elements[0] = Some(Element::new(&5, graph_name));
         middle_right_node.borrow_mut().keys[0] = Some(5);
         middle_right_node.borrow_mut().size = 1;
 

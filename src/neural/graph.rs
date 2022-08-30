@@ -14,7 +14,6 @@ use super::{
     node::Node
 };
 
-#[derive(Clone, Debug)]
 pub struct ASAGraph<Key, const ORDER: usize = 25>
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
     pub name: Rc<str>,
@@ -223,9 +222,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     fn insert_first_element(
         &mut self, node: &Rc<RefCell<Node<Key, ORDER>>>,  key: &Key
     ) -> Rc<RefCell<Element<Key, ORDER>>> {
-        let element_pointer = Rc::new(
-            RefCell::new(Element::<Key, ORDER>::new(key, &self.name))
-        );
+        let element_pointer = Element::<Key, ORDER>::new(key, &self.name);
         node.borrow_mut().elements[0] = Some(element_pointer.clone());
         node.borrow_mut().keys[0] = Some(key.clone());
 
