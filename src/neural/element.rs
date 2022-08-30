@@ -15,7 +15,7 @@ use bionet_common::{
 };
 
 pub struct Element<Key, const ORDER: usize>
-where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
+where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
     pub key: Key,
     pub counter: usize,
     pub activation: f32,
@@ -23,7 +23,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     pub(crate) self_ptr: Weak<RefCell<Element<Key, ORDER>>>,
     pub(crate) next: Option<Weak<RefCell<Element<Key, ORDER>>>>,
     pub(crate) prev: Option<Weak<RefCell<Element<Key, ORDER>>>>,
-    pub(crate) definitions: Vec<Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>>,
+    pub(crate) definitions: Vec<Rc<RefCell<DefiningConnection<Self, dyn Neuron>>>>,
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 

@@ -15,7 +15,7 @@ use super::{
 };
 
 pub struct ASAGraph<Key, const ORDER: usize = 25>
-where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
+where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
     pub name: Rc<str>,
     pub root: Rc<RefCell<Node<Key, ORDER>>>,
     pub(crate) element_min: Option<Rc<RefCell<Element<Key, ORDER>>>>,

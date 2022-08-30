@@ -12,7 +12,7 @@ use bionet_common::{
 use super::element::Element;
 
 pub struct Node<Key, const ORDER: usize>
-where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
+where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
     pub(crate) size: usize,
     pub(crate) is_leaf: bool,
     pub(crate) parent: Option<Weak<RefCell<Node<Key, ORDER>>>>,
