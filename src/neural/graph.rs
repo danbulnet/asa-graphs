@@ -8,12 +8,9 @@ use std::{
 use bionet_common::{
     sensor::Sensor,
     distances::Distance,
-    connection::Connection,
     neuron::{ Neuron, NeuronID },
     data::DataCategory
 };
-
-use crate::simple::element;
 
 use super::{
     element::Element,
@@ -418,6 +415,54 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     }
 }
 
+impl<'a, Key, const ORDER: usize> IntoIterator for &'a ASAGraph<Key, ORDER> 
+where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
+    type Item = Rc<RefCell<Element<Key, ORDER>>>;
+    type IntoIter = ASAGraphIntoIterator<'a, Key, ORDER>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ASAGraphIntoIterator {
+            graph: self,
+            index: match self.element_min.clone() {
+                Some(element_min) => Some(element_min.clone()),
+                None => None
+            },
+        }
+    }
+}
+
+pub struct ASAGraphIntoIterator<'a, Key, const ORDER: usize = 25>
+where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
+    graph: &'a ASAGraph<Key, ORDER>,
+    index: Option<Rc<RefCell<Element<Key, ORDER>>>>
+}
+
+impl<'a, Key, const ORDER: usize> Iterator for ASAGraphIntoIterator<'a, Key, ORDER> 
+where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
+    type Item = Rc<RefCell<Element<Key, ORDER>>>;
+    fn next(&mut self) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
+        let next_option;
+        let result = match self.index.clone() {
+            Some(element) => {
+                next_option = match &element.borrow().next {
+                    Some(next_tuple) => match next_tuple.0.upgrade() {
+                        Some(next) => Some(next),
+                        None => None
+                    },
+                    None => None
+                };
+
+                Some(element)
+            },
+            None => return None
+        };
+
+        self.index = next_option;
+
+        result
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use rand::Rng;
@@ -425,6 +470,8 @@ pub mod tests {
 
     use bionet_common::data::DataCategory;
     
+    use crate::neural::element;
+
     use super::ASAGraph;
 
     #[test]
@@ -597,6 +644,16 @@ pub mod tests {
             }
             prev_element = current_element.clone();
             current_element = prev_element.borrow().next.as_ref().unwrap().0.upgrade().unwrap().clone();
+        }
+    }
+
+    #[test]
+    fn iterator_test() {
+        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
+        let n = 50;
+        for i in (0..=n).rev() { graph.insert(&i); }
+        for (i, element) in graph.into_iter().enumerate() {
+            assert_eq!(element.borrow().key, i as i32);
         }
     }
 }
