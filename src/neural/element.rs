@@ -24,7 +24,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
     pub(crate) self_ptr: Weak<RefCell<Element<Key, ORDER>>>,
     pub(crate) next: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
     pub(crate) prev: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
-    pub(crate) definitions: Vec<Rc<RefCell<DefiningConnection<Self, dyn Neuron>>>>,
+    pub(crate) definitions: Vec<Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>>,
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
@@ -252,7 +252,7 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
 
 impl<Key, const ORDER: usize> NeuronConnect for Element<Key, ORDER> 
 where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); ORDER + 1]: {
-    fn connect(
+    fn connect_to(
         &mut self, to: Rc<RefCell<dyn Neuron>>, kind: ConnectionKind
     ) -> Result<Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>, String> {
         match kind {
@@ -266,8 +266,44 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
 
                 Ok(connection)
             },
-            _ => Err("only explanatory connection can be created fo asa-graphs element".to_string())
+            _ => {
+                let msg = "only defining connection to element can be created for asa-graphs";
+                log::error!("{}", msg);
+                Err(msg.to_string())
+            }
         }
+    }
+
+    fn connect_to_connection(
+        &mut self, to: Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>
+    ) -> Result<Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>, String> {
+        match to.borrow().kind() {
+            ConnectionKind::Defining => {
+                self.definitions.push(to.clone());
+                Ok(to.clone())
+            },
+            _ => {
+                let msg = "only defining connection to element can be created for asa-graphs";
+                log::error!("{}", msg);
+                Err(msg.to_string())
+            }
+        }
+    }
+
+    fn connect_from(
+        &mut self, _from: Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>
+    ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>, String> {
+        let msg = "only defining connection to neuron can be created for asa-graphs element";
+        log::error!("{}", msg);
+        Err(msg.to_string())
+    }
+
+    fn connect_from_connection(
+        &mut self, from: Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>
+    ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>, String> {
+        let msg = "only defining connection to neuron can be created for asa-graphs element";
+        log::error!("{}", msg);
+        Err(msg.to_string())
     }
 }
 
@@ -383,7 +419,7 @@ mod tests {
         assert_eq!(element_1_ptr.borrow().activation(), 0.0f32);
         
         let connection = element_1_ptr
-            .borrow_mut().connect(element_2_ptr.clone(), ConnectionKind::Defining).unwrap();
+            .borrow_mut().connect_to(element_2_ptr.clone(), ConnectionKind::Defining).unwrap();
         assert!(std::ptr::eq(connection.borrow().from().as_ptr(), element_1_ptr.as_ptr()));
         assert!(std::ptr::eq(connection.borrow().to().as_ptr(), element_2_ptr.as_ptr()));
 
