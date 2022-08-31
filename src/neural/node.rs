@@ -209,7 +209,8 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     pub(crate) fn insert_key_leaf(
         node: &Rc<RefCell<Node<Key, ORDER>>>, 
         key: &Key, 
-        parent: &Rc<str>
+        parent: &Rc<str>,
+        range: f32
     ) -> Rc<RefCell<Element<Key, ORDER>>> {
         let node_size = node.borrow().size;
 
@@ -242,7 +243,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
                 if let Some(next) = node.borrow().elements[1].as_ref() {
                     next_ptr = Some(next.clone());
                     prev_ptr = match next.as_ref().borrow().prev.as_ref() {
-                        Some(v) => Some(v.upgrade().unwrap()),
+                        Some(v) => Some(v.0.upgrade().unwrap()),
                         None => None
                     };
                 }
@@ -250,7 +251,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
                 if let Some(prev) = node.borrow().elements[index - 1].as_ref() {
                     prev_ptr = Some(prev.clone());
                     next_ptr = match prev.as_ref().borrow().next.as_ref() {
-                        Some(e) => Some(e.upgrade().unwrap().clone()),
+                        Some(e) => Some(e.0.upgrade().unwrap().clone()),
                         None => None
                     };
                 }
@@ -258,7 +259,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         }
 
         Element::<Key, ORDER>::set_connections(
-            &new_element, prev_ptr.as_ref(), next_ptr.as_ref()
+            &new_element, prev_ptr.as_ref(), next_ptr.as_ref(), range
         );
         node.borrow_mut().size += 1;
 
@@ -341,8 +342,8 @@ mod tests {
         root.borrow_mut().keys[0] = Some(2);
         root.borrow_mut().size = 1;
 
-        Node::insert_key_leaf(&root, &-1, graph_name);
-        Node::insert_key_leaf(&root, &1, graph_name);
+        Node::insert_key_leaf(&root, &-1, graph_name, 1f32);
+        Node::insert_key_leaf(&root, &1, graph_name, 1f32);
         root.borrow().insert_existing_key(&1, true);
         root.borrow().insert_existing_key(&-1, true);
         root.borrow().insert_existing_key(&2, true);
@@ -370,8 +371,8 @@ mod tests {
         root.borrow_mut().keys[0] = Some(1);
         root.borrow_mut().size = 1;
 
-        Node::insert_key_leaf(&root, &6, graph_name);
-        Node::insert_key_leaf(&root, &7, graph_name);
+        Node::insert_key_leaf(&root, &6, graph_name, 5f32);
+        Node::insert_key_leaf(&root, &7, graph_name, 6f32);
 
         let root_new = Rc::new(RefCell::new(Node::new(false, None)));
         root_new.borrow_mut().children[0] = Some(root.clone());
@@ -399,8 +400,8 @@ mod tests {
         assert!(root_new.borrow().children[0].as_ref().unwrap().borrow().elements[1].is_none());
         assert!(root_new.borrow().children[1].as_ref().unwrap().borrow().elements[1].is_none());
 
-        Node::insert_key_leaf(&root_new, &2, graph_name);
-        Node::insert_key_leaf(&root_new, &4, graph_name);
+        Node::insert_key_leaf(&root_new, &2, graph_name, 6f32);
+        Node::insert_key_leaf(&root_new, &4, graph_name, 6f32);
 
         let middle_left_node = Rc::new(
             RefCell::new(Node::new(true, Some(Rc::downgrade(&root_new))))

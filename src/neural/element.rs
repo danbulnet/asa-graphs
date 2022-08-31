@@ -1,7 +1,8 @@
 use std::{
     fmt::{ Display, Formatter, Result as FmtResult },
     rc::{ Rc, Weak },
-    cell::RefCell
+    cell::RefCell,
+    collections::HashMap
 };
 
 use bionet_common::{
@@ -21,13 +22,15 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
     pub activation: f32,
     pub parent: Rc<str>,
     pub(crate) self_ptr: Weak<RefCell<Element<Key, ORDER>>>,
-    pub(crate) next: Option<Weak<RefCell<Element<Key, ORDER>>>>,
-    pub(crate) prev: Option<Weak<RefCell<Element<Key, ORDER>>>>,
+    pub(crate) next: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
+    pub(crate) prev: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
     pub(crate) definitions: Vec<Rc<RefCell<DefiningConnection<Self, dyn Neuron>>>>,
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:  {
+    const INTERELEMENT_ACTIVATION_THRESHOLD: f32 = 0.8;
+
     pub fn new(key: &Key, parent: &Rc<str>)
     -> Rc<RefCell<Element<Key, ORDER>>> {
         let element_ptr = Rc::new(
@@ -49,28 +52,140 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         element_ptr
     }
 
-    pub fn set_connections(
+    pub(crate) fn set_connections(
         element_ptr: &Rc<RefCell<Element<Key, ORDER>>>,
         prev_opt: Option<&Rc<RefCell<Element<Key, ORDER>>>>,
-        next_opt: Option<&Rc<RefCell<Element<Key, ORDER>>>>
+        next_opt: Option<&Rc<RefCell<Element<Key, ORDER>>>>,
+        range: f32
     ) {
         let mut element = element_ptr.borrow_mut();
         
         if prev_opt.is_some() {
             let prev_ptr = prev_opt.unwrap();
-            element.prev = Some(Rc::downgrade(prev_ptr));
-            prev_ptr.borrow_mut().next = Some(Rc::downgrade(element_ptr));
+            let weight = (&*element).weight(&*prev_ptr.borrow(), range);
+            element.prev = Some((Rc::downgrade(prev_ptr), weight));
+            prev_ptr.borrow_mut().next = Some((Rc::downgrade(element_ptr), weight));
         } else { 
             element.prev = None; 
         }
 
         if next_opt.is_some() {
             let next_ptr = next_opt.unwrap();
-            element.next = Some(Rc::downgrade(next_ptr));
-            next_ptr.borrow_mut().prev = Some(Rc::downgrade(&element_ptr));
+            let weight = (&*element).weight(&*next_ptr.borrow(), range);
+            element.next = Some((Rc::downgrade(next_ptr), weight));
+            next_ptr.borrow_mut().prev = Some((Rc::downgrade(&element_ptr), weight));
         } else { 
             element.next = None; 
         }
+    }
+
+    pub fn weight(&self, other: &Self, range: f32) -> f32 {
+        1.0f32 - (other.key.distance(&self.key) as f32).abs() / range
+    }
+
+    pub(crate) fn fuzzy_activate(
+        &mut self, signal: f32
+    ) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
+        self.activation += signal;
+
+        let mut neurons = HashMap::new();
+
+        for definition in &self.definitions {
+            let neuron = definition.borrow().to();
+            neurons.insert(neuron.borrow().id(), neuron.clone());
+        }
+
+        let mut element_activation = self.activation;
+        if let Some(next) = &self.next {
+            let mut element = next.0.upgrade().unwrap();
+            let mut weight = next.1; // TODO
+            while element_activation > Self::INTERELEMENT_ACTIVATION_THRESHOLD {
+                element.borrow_mut().activate(element_activation * weight, false, false);
+                for definition in &element.borrow().definitions {
+                    let neuron = definition.borrow().to();
+                    neurons.insert(neuron.borrow().id(), neuron.clone());
+                }
+
+                let new_element = match &element.borrow().next {
+                    Some(next) => {
+                        weight = next.1;
+                        next.0.upgrade().unwrap()
+                    },
+                    None => break
+                };
+                element = new_element;
+                element_activation = element.borrow().activation;
+            }
+        }
+        
+        element_activation = self.activation;
+        if let Some(prev) = &self.prev {
+            let mut element = prev.0.upgrade().unwrap();
+            let mut weight = prev.1; // TODO
+            while element_activation > Self::INTERELEMENT_ACTIVATION_THRESHOLD {
+                element.borrow_mut().activate(element_activation * weight, false, false);
+                for definition in &element.borrow().definitions {
+                    let neuron = definition.borrow().to();
+                    neurons.insert(neuron.borrow().id(), neuron.clone());
+                }
+
+                let new_element = match &element.borrow().prev {
+                    Some(prev) => {
+                        weight = prev.1;
+                        prev.0.upgrade().unwrap()
+                    },
+                    None => break
+                };
+                element = new_element;
+                element_activation = element.borrow().activation;
+            }
+        }
+
+        neurons
+    }
+
+    pub(crate) fn deactivate_neighbours(&mut self) {
+        self.activation = 0.0f32;
+
+        if let Some(next) = &self.next {
+            let mut element = next.0.upgrade().unwrap();
+            loop {
+                element.borrow_mut().activation = 0.0f32;
+                let new_element = match &element.borrow().next {
+                    Some(next) => next.0.upgrade().unwrap(),
+                    None => break
+                };
+                element = new_element;
+            }
+        }
+        
+        if let Some(prev) = &self.prev {
+            let mut element = prev.0.upgrade().unwrap();
+            loop {
+                element.borrow_mut().activation = 0.0f32;
+                let new_element = match &element.borrow().prev {
+                    Some(prev) => prev.0.upgrade().unwrap(),
+                    None => break
+                };
+                element = new_element;
+            }
+        }
+    }
+
+    pub(crate) fn simple_activate(
+        &mut self, signal: f32
+    )-> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
+        self.activation += signal;
+        self.defined_neurons()
+    }
+
+    pub(crate) fn defined_neurons(&self) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
+        let mut neurons = HashMap::new();
+        for definition in &self.definitions {
+            let neuron = definition.borrow().to();
+            neurons.insert(neuron.borrow().id(), neuron.clone());
+        }
+        neurons
     }
 }
 
@@ -91,41 +206,45 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
 
     fn activate(
         &mut self, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
-    ) -> Vec<Rc<RefCell<dyn Neuron>>> {
-        self.activation += signal;
-
-        let mut activated_neurons = Vec::new();
-
-        if propagate_horizontal {
-            // TODO
-        }
+    ) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
+        let mut neurons = if propagate_horizontal{
+            self.fuzzy_activate(signal)
+        } else {
+            self.simple_activate(signal)
+        };
 
         if propagate_vertical {
-            for e in &self.definitions {
-                let to = e.borrow().to().clone();
-                let is_sensor = to.borrow().is_sensor();
-                to.borrow_mut().activate(self.activation, propagate_horizontal, !is_sensor);
-                activated_neurons.push(to);
+            for (_id, neuron) in &neurons.clone() {
+                if !neuron.borrow().is_sensor() {
+                    neurons.extend(
+                        neuron.borrow_mut().activate(
+                            self.activation, propagate_horizontal, propagate_vertical
+                        )
+                    );
+                }
             }
         }
 
-        activated_neurons
+        neurons
     }
 
-    fn explain(&mut self) -> Vec<Rc<RefCell<dyn Neuron>>> { Vec::new() }
+    fn explain(&mut self) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> { 
+        HashMap::from(
+            [(self.id(), self.self_ptr.upgrade().unwrap() as Rc<RefCell<dyn Neuron>>)]
+        ) 
+    }
 
     fn deactivate(&mut self, propagate_horizontal: bool, propagate_vertical: bool) {
         self.activation = 0.0f32;
 
-        if propagate_horizontal {
-            // TODO
-        }
+        if propagate_horizontal { self.deactivate_neighbours(); }
 
         if propagate_vertical {
-            for e in &self.definitions {
-                let to = e.borrow().to().clone();
-                let is_sensor = to.borrow().is_sensor();
-                to.borrow_mut().deactivate(propagate_horizontal, !is_sensor);
+            for definition in &self.definitions {
+                let neuron = definition.borrow().to().clone();
+                if !neuron.borrow().is_sensor() {
+                    neuron.borrow_mut().deactivate(propagate_horizontal, propagate_vertical);
+                }
             }
         }
     }
@@ -193,38 +312,38 @@ mod tests {
         assert!(element_3_ptr.borrow().prev.is_none());
         assert!(element_3_ptr.borrow().next.is_none());
         
-        Element::set_connections(&element_2_ptr, Some(&element_1_ptr), None);
+        Element::set_connections(&element_2_ptr, Some(&element_1_ptr), None, 2f32);
 
         assert!(element_1_ptr.borrow().prev.is_none());
         assert_eq!(
-            element_1_ptr.borrow().next.as_ref().unwrap().upgrade().unwrap().borrow().key,
+            element_1_ptr.borrow().next.as_ref().unwrap().0.upgrade().unwrap().borrow().key,
             element_2_ptr.borrow().key
         );
         assert!(element_2_ptr.borrow().next.is_none());
         assert!(element_3_ptr.borrow().prev.is_none());
         assert!(element_3_ptr.borrow().next.is_none());
 
-        Element::set_connections(&element_2_ptr, None, Some(&element_3_ptr));
+        Element::set_connections(&element_2_ptr, None, Some(&element_3_ptr), 2f32);
 
         assert!(element_1_ptr.borrow().prev.is_none());
         assert_eq!(
-            element_1_ptr.borrow().next.as_ref().unwrap().upgrade().unwrap().borrow().key,
+            element_1_ptr.borrow().next.as_ref().unwrap().0.upgrade().unwrap().borrow().key,
             element_2_ptr.borrow().key
         );
         assert!(element_2_ptr.borrow().prev.is_none());
         assert_eq!(
-            element_2_ptr.borrow().next.as_ref().unwrap().upgrade().unwrap().borrow().key,
+            element_2_ptr.borrow().next.as_ref().unwrap().0.upgrade().unwrap().borrow().key,
             element_3_ptr.borrow().key
         );
         assert_eq!(
-            element_3_ptr.borrow().prev.as_ref().unwrap().upgrade().unwrap().borrow().key, 
+            element_3_ptr.borrow().prev.as_ref().unwrap().0.upgrade().unwrap().borrow().key, 
             element_2_ptr.borrow().key
         );
         assert!(element_3_ptr.borrow().next.is_none());
 
-        Element::set_connections(&element_1_ptr, None, None);
-        Element::set_connections(&element_2_ptr, None, None);
-        Element::set_connections(&element_3_ptr, None, None);
+        Element::set_connections(&element_1_ptr, None, None, 2f32);
+        Element::set_connections(&element_2_ptr, None, None, 2f32);
+        Element::set_connections(&element_3_ptr, None, None, 2f32);
 
         assert!(element_1_ptr.borrow().prev.is_none());
         assert!(element_1_ptr.borrow().next.is_none());

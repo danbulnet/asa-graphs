@@ -1,15 +1,19 @@
 use std::{
     fmt::Display,
     rc::Rc,
-    cell::{RefCell, Ref}
+    cell::RefCell,
+    collections::HashMap
 };
 
 use bionet_common::{
     sensor::Sensor,
     distances::Distance,
     connection::Connection,
-    neuron::{ Neuron, NeuronConnect }, data::DataCategory
+    neuron::{ Neuron, NeuronID },
+    data::DataCategory
 };
+
+use crate::simple::element;
 
 use super::{
     element::Element,
@@ -48,9 +52,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
 
     fn activate(
         &mut self, item: &Key, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
-    ) -> Result<Vec<Rc<RefCell<dyn Neuron>>>, String> {
-        let mut activated_neurons = Vec::new();
-
+    ) -> Result<HashMap<NeuronID, Rc<RefCell<dyn Neuron>>>, String> {
         let element = match self.search(item) {
             Some(e) => e,
             None => { 
@@ -82,25 +84,8 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
                 }
             }
         };
-        
-        element.borrow_mut().activation += signal;
 
-        if propagate_horizontal {
-            // TODO
-        }
-
-        if propagate_vertical {
-            for e in &element.borrow().definitions {
-                let to = e.borrow().to().clone();
-                let is_sensor = to.borrow().is_sensor();
-                to.borrow_mut().activate(
-                    element.borrow().activation, propagate_horizontal, !is_sensor
-                );
-                activated_neurons.push(to);
-            }
-        }
-
-        Ok(activated_neurons)
+        Ok(element.clone().borrow_mut().activate(signal, propagate_horizontal, propagate_vertical))
     }
 
     fn deactivate(
@@ -114,27 +99,8 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
             }
         };
 
-        let mut connected_neurons: Vec<Rc<RefCell<dyn Neuron>>> = Vec::new();
+        element.borrow_mut().deactivate(propagate_horizontal, propagate_vertical);
 
-        if propagate_vertical {
-            for e in &element.borrow().definitions {
-                let to = e.borrow().to().clone();
-                let is_sensor = to.borrow().is_sensor();
-                to.borrow_mut().deactivate(propagate_horizontal, !is_sensor);
-                connected_neurons.push(to);
-            }
-        }
-
-        if propagate_horizontal {
-            // TODO
-        }
-
-        if propagate_vertical {
-            for neuron in &connected_neurons {
-                let is_sensor = neuron.borrow().is_sensor();
-                neuron.borrow_mut().deactivate(!is_sensor, !is_sensor);
-            }
-        }
         Ok(())
     }
 
@@ -144,18 +110,15 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
             None => { log::warn!("no element_min in asa-graph"); return }
         };
 
-        let mut counter = 0;
         loop {
             element.borrow_mut().deactivate(false, false);
-            counter += 1;
 
             let new_element= match &element.borrow().next {
-                Some(e) => e.upgrade().unwrap().clone(),
+                Some(e) => e.0.upgrade().unwrap().clone(),
                 None => break
             };
             element = new_element;
         }
-        log::info!("deactivated {counter} neurons for sensor {}", self.name());
     }
 }
 
@@ -264,7 +227,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             let mut index = node_insert_result.1;
     
             if node.borrow().is_leaf {
-                let element = Node::insert_key_leaf(&node, key, &self.name);
+                let element = Node::insert_key_leaf(&node, key, &self.name, self.range());
                 self.set_extrema(&element);
                 return element
             } else {
@@ -282,6 +245,12 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             }
         }
     }
+
+    pub fn range(&self) -> f32 { 
+        if self.key_min.is_none() || self.key_max.is_none() { return f32::NAN }
+        let ret = self.key_min.as_ref().unwrap().distance(self.key_max.as_ref().unwrap()) as f32;
+        if ret == 0.0f32 { 1.0f32 } else { ret }
+     }
 
     pub fn print_graph(&self) {
         let mut height = 0;
@@ -354,6 +323,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         let key = &element.borrow().key;
         let key_min = &self.key_min;
         let key_max = &self.key_max;
+        let mut should_update_weights = false;
         if key_min.is_none() != key_max.is_none() {
             panic!("inconsistent extremas: key_min.is_none() != key_max.is_none()")
         } else if self.key_min.is_none() || self.key_max.is_none() {
@@ -361,15 +331,57 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             self.key_max = Some(key.clone());
             self.element_min = Some(element.clone());
             self.element_max = Some(element.clone());
+            should_update_weights = true;
         } else {
             if key < key_min.as_ref().unwrap() {
                 self.key_min = Some(key.clone());
                 self.element_min = Some(element.clone());
+                should_update_weights = true;
             }
             if key > key_max.as_ref().unwrap() {
                 self.key_max = Some(key.clone());
                 self.element_max = Some(element.clone());
+                should_update_weights = true;
             }   
+        }
+
+        if should_update_weights {
+            let range = self.key_min.as_ref().unwrap().distance(self.key_max.as_ref().unwrap());
+            self.update_elements_weights(range as f32);
+        }
+    }
+
+    fn update_elements_weights(&mut self, range: f32) {
+        let mut element = match &self.element_min {
+            Some(e) => e.clone(),
+            None => return
+        };
+        loop {
+            match &element.borrow().prev {
+                Some(e) => {
+                    let element_ptr = element.as_ptr();
+                    let prev_element = e.0.upgrade().unwrap().clone();
+                    let prev_element_ptr = prev_element.as_ptr();
+                    let weight = element.borrow().weight(&*prev_element.borrow(), range);
+                    unsafe { (&mut *element_ptr).prev = Some((Rc::downgrade(&prev_element), weight)) };
+                    unsafe { (&mut *prev_element_ptr).next = Some((Rc::downgrade(&element), weight)) };
+                },
+                None => {}
+            };
+
+            let next_element= match &element.borrow().next {
+                Some(e) => {
+                    let element_ptr = element.as_ptr();
+                    let next_element = e.0.upgrade().unwrap().clone();
+                    let next_element_ptr = next_element.as_ptr();
+                    let weight = element.borrow().weight(&*next_element.borrow(), range);
+                    unsafe { (&mut *element_ptr).next = Some((Rc::downgrade(&next_element), weight)) };
+                    unsafe { (&mut *next_element_ptr).prev = Some((Rc::downgrade(&element), weight)) };
+                    next_element
+                },
+                None => return
+            };
+            element = next_element;
         }
     }
 
@@ -382,7 +394,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         loop {
             counter += 1;
             let new_element= match &element.borrow().next {
-                Some(e) => e.upgrade().unwrap().clone(),
+                Some(e) => e.0.upgrade().unwrap().clone(),
                 None => return counter
             };
             element = new_element;
@@ -398,7 +410,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         loop {
             counter += element.borrow().counter;
             let new_element= match &element.borrow().next {
-                Some(e) => e.upgrade().unwrap().clone(),
+                Some(e) => e.0.upgrade().unwrap().clone(),
                 None => return counter
             };
             element = new_element;
@@ -540,18 +552,18 @@ pub mod tests {
                 let next = &current_element.borrow().next;
                 if i == 1 { 
                     assert!(prev.is_none());
-                    assert_eq!(next.as_ref().unwrap().upgrade().unwrap().borrow().key, 2);
+                    assert_eq!(next.as_ref().unwrap().0.upgrade().unwrap().borrow().key, 2);
                 } else if i == n {
-                    assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, n - 1);
+                    assert_eq!(prev.as_ref().unwrap().0.upgrade().unwrap().borrow().key, n - 1);
                     assert!(next.is_none());
                     break
                 } else {
-                    assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, i - 1);
-                    assert_eq!(next.as_ref().unwrap().upgrade().unwrap().borrow().key, i + 1);
+                    assert_eq!(prev.as_ref().unwrap().0.upgrade().unwrap().borrow().key, i - 1);
+                    assert_eq!(next.as_ref().unwrap().0.upgrade().unwrap().borrow().key, i + 1);
                 }
             }
             prev_element = current_element.clone();
-            current_element = prev_element.borrow().next.as_ref().unwrap().upgrade().unwrap().clone();
+            current_element = prev_element.borrow().next.as_ref().unwrap().0.upgrade().unwrap().clone();
         }
     }
 
@@ -573,18 +585,18 @@ pub mod tests {
                 let next = &current_element.borrow().next;
                 if i == 1 { 
                     assert!(prev.is_none());
-                    assert_eq!(next.as_ref().unwrap().upgrade().unwrap().borrow().key, 2);
+                    assert_eq!(next.as_ref().unwrap().0.upgrade().unwrap().borrow().key, 2);
                 } else if i == n {
-                    assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, n - 1);
+                    assert_eq!(prev.as_ref().unwrap().0.upgrade().unwrap().borrow().key, n - 1);
                     assert!(next.is_none());
                     break
                 } else {
-                    assert_eq!(prev.as_ref().unwrap().upgrade().unwrap().borrow().key, i - 1);
-                    assert_eq!(next.as_ref().unwrap().upgrade().unwrap().borrow().key, i + 1);
+                    assert_eq!(prev.as_ref().unwrap().0.upgrade().unwrap().borrow().key, i - 1);
+                    assert_eq!(next.as_ref().unwrap().0.upgrade().unwrap().borrow().key, i + 1);
                 }
             }
             prev_element = current_element.clone();
-            current_element = prev_element.borrow().next.as_ref().unwrap().upgrade().unwrap().clone();
+            current_element = prev_element.borrow().next.as_ref().unwrap().0.upgrade().unwrap().clone();
         }
     }
 }
