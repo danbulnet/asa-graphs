@@ -25,8 +25,8 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
     pub name: Rc<str>,
     pub data_category: DataCategory,
     pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
-    pub(crate) element_min: Option<Rc<RefCell<Element<Key, ORDER>>>>,
-    pub(crate) element_max: Option<Rc<RefCell<Element<Key, ORDER>>>>,
+    pub element_min: Option<Rc<RefCell<Element<Key, ORDER>>>>,
+    pub element_max: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub key_min: Option<Key>,
     pub key_max: Option<Key>
 }

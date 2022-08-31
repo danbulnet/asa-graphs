@@ -11,6 +11,7 @@ use bionet_common::{
     connection::{ 
         Connection, 
         ConnectionKind,
+        ConnectionID,
         defining_connection::DefiningConnection
     }
 };
@@ -22,14 +23,14 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
     pub activation: f32,
     pub parent: Rc<str>,
     pub(crate) self_ptr: Weak<RefCell<Element<Key, ORDER>>>,
-    pub(crate) next: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
-    pub(crate) prev: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
-    pub(crate) definitions: Vec<Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>>,
+    pub next: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
+    pub prev: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
+    pub definitions: HashMap<ConnectionID, Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>>,
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:  {
-    const INTERELEMENT_ACTIVATION_THRESHOLD: f32 = 0.8;
+    pub const INTERELEMENT_ACTIVATION_THRESHOLD: f32 = 0.8;
 
     pub fn new(key: &Key, parent: &Rc<str>)
     -> Rc<RefCell<Element<Key, ORDER>>> {
@@ -43,7 +44,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
                     self_ptr: Weak::new(), 
                     next: None,
                     prev: None,
-                    definitions: Vec::new()
+                    definitions: HashMap::new()
                 }
             )
         );
@@ -83,14 +84,14 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         1.0f32 - (other.key.distance(&self.key) as f32).abs() / range
     }
 
-    pub(crate) fn fuzzy_activate(
+    pub fn fuzzy_activate(
         &mut self, signal: f32
     ) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
         self.activation += signal;
 
         let mut neurons = HashMap::new();
 
-        for definition in &self.definitions {
+        for (_id, definition) in &self.definitions {
             let neuron = definition.borrow().to();
             neurons.insert(neuron.borrow().id(), neuron.clone());
         }
@@ -98,10 +99,10 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         let mut element_activation = self.activation;
         if let Some(next) = &self.next {
             let mut element = next.0.upgrade().unwrap();
-            let mut weight = next.1; // TODO
+            let mut weight = next.1;
             while element_activation > Self::INTERELEMENT_ACTIVATION_THRESHOLD {
                 element.borrow_mut().activate(element_activation * weight, false, false);
-                for definition in &element.borrow().definitions {
+                for (_id, definition) in &element.borrow().definitions {
                     let neuron = definition.borrow().to();
                     neurons.insert(neuron.borrow().id(), neuron.clone());
                 }
@@ -113,18 +114,18 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
                     },
                     None => break
                 };
-                element = new_element;
                 element_activation = element.borrow().activation;
+                element = new_element;
             }
         }
         
         element_activation = self.activation;
         if let Some(prev) = &self.prev {
             let mut element = prev.0.upgrade().unwrap();
-            let mut weight = prev.1; // TODO
+            let mut weight = prev.1;
             while element_activation > Self::INTERELEMENT_ACTIVATION_THRESHOLD {
                 element.borrow_mut().activate(element_activation * weight, false, false);
-                for definition in &element.borrow().definitions {
+                for (_id, definition) in &element.borrow().definitions {
                     let neuron = definition.borrow().to();
                     neurons.insert(neuron.borrow().id(), neuron.clone());
                 }
@@ -136,8 +137,8 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
                     },
                     None => break
                 };
-                element = new_element;
                 element_activation = element.borrow().activation;
+                element = new_element;
             }
         }
 
@@ -181,7 +182,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
 
     pub(crate) fn defined_neurons(&self) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
         let mut neurons = HashMap::new();
-        for definition in &self.definitions {
+        for (_id, definition) in &self.definitions {
             let neuron = definition.borrow().to();
             neurons.insert(neuron.borrow().id(), neuron.clone());
         }
@@ -240,7 +241,7 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
         if propagate_horizontal { self.deactivate_neighbours(); }
 
         if propagate_vertical {
-            for definition in &self.definitions {
+            for (_id, definition) in &self.definitions {
                 let neuron = definition.borrow().to().clone();
                 if !neuron.borrow().is_sensor() {
                     neuron.borrow_mut().deactivate(propagate_horizontal, propagate_vertical);
@@ -259,11 +260,10 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
             ConnectionKind::Defining => {
                 let connection = Rc::new(RefCell::new(DefiningConnection::new(
                     self.self_ptr.upgrade().unwrap(), 
-                    to
+                    to.clone()
                 )));
-
-                self.definitions.push(connection.clone());
-
+                let connection_id = ConnectionID { from: self.id(), to: to.borrow().id() };
+                self.definitions.insert(connection_id, connection.clone());
                 Ok(connection)
             },
             _ => {
@@ -279,7 +279,9 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
     ) -> Result<Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>, String> {
         match to.borrow().kind() {
             ConnectionKind::Defining => {
-                self.definitions.push(to.clone());
+                let to_neuron = to.borrow().to().clone();
+                let connection_id = ConnectionID { from: self.id(), to: to_neuron.borrow().id() };
+                self.definitions.insert(connection_id, to.clone());
                 Ok(to.clone())
             },
             _ => {
@@ -291,7 +293,7 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
     }
 
     fn connect_from(
-        &mut self, _from: Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>
+        &mut self, _from: Rc<RefCell<dyn Neuron>>, _kind: ConnectionKind
     ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>, String> {
         let msg = "only defining connection to neuron can be created for asa-graphs element";
         log::error!("{}", msg);
@@ -299,7 +301,7 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
     }
 
     fn connect_from_connection(
-        &mut self, from: Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>
+        &mut self, _from: Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>
     ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>, String> {
         let msg = "only defining connection to neuron can be created for asa-graphs element";
         log::error!("{}", msg);
@@ -334,7 +336,9 @@ mod tests {
 
     #[test]
     fn set_connections() {
-        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical)));
+        let graph = Rc::new(
+            RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical))
+        );
         let graph_name = &graph.borrow().name;
 
         let element_1_ptr: Rc<RefCell<Element<i32, 3>>> = Element::new(&1, graph_name);
@@ -417,6 +421,8 @@ mod tests {
         assert_eq!(element_1_ptr.borrow().is_sensor(), true);
 
         assert_eq!(element_1_ptr.borrow().activation(), 0.0f32);
+
+        assert_eq!(element_1_ptr.borrow().counter(), 1usize);
         
         let connection = element_1_ptr
             .borrow_mut().connect_to(element_2_ptr.clone(), ConnectionKind::Defining).unwrap();
@@ -425,8 +431,183 @@ mod tests {
 
         let activated = element_1_ptr.borrow_mut().activate(1.0f32, true, true);
         assert_eq!(activated.len(), 1);
-
         assert_eq!(element_1_ptr.borrow().activation(), 1.0f32);
-        assert_eq!(element_2_ptr.borrow().activation(), 1.0f32);
+        assert_eq!(element_2_ptr.borrow().activation(), 0.0f32);
+
+        element_1_ptr.borrow_mut().activate(1.0f32, false, true);
+        assert_eq!(element_1_ptr.borrow().activation(), 2.0f32);
+        element_1_ptr.borrow_mut().deactivate(true, true);
+        assert_eq!(element_1_ptr.borrow().activation(), 0.0f32);
+        assert_eq!(element_2_ptr.borrow().activation(), 0.0f32);
+
+        element_1_ptr.borrow_mut().activate(1.0f32, true, false);
+        assert_eq!(element_1_ptr.borrow().activation(), 1.0f32);
+        element_1_ptr.borrow_mut().deactivate(false, true);
+        assert_eq!(element_1_ptr.borrow().activation(), 0.0f32);
+        assert_eq!(element_2_ptr.borrow().activation(), 0.0f32);
+
+        element_1_ptr.borrow_mut().activate(1.0f32, false, false);
+        assert_eq!(element_1_ptr.borrow().activation(), 1.0f32);
+        element_1_ptr.borrow_mut().deactivate(true, false);
+        assert_eq!(element_1_ptr.borrow().activation(), 0.0f32);
+        assert_eq!(element_2_ptr.borrow().activation(), 0.0f32);
+
+        element_1_ptr.borrow_mut().activate(1.0f32, false, false);
+        assert_eq!(element_1_ptr.borrow().activation(), 1.0f32);
+        element_1_ptr.borrow_mut().deactivate(false, false);
+        assert_eq!(element_1_ptr.borrow().activation(), 0.0f32);
+
+        let exp_1 = element_1_ptr.borrow_mut().explain();
+        assert_eq!(exp_1.len(), 1);
+        assert_eq!(exp_1.keys().into_iter().next().unwrap(), &element_1_ptr.borrow().id());
+    }
+
+    #[test]
+    fn fuzzy_activate_deactivate() {
+        assert_eq!(Element::<i32, 3>::INTERELEMENT_ACTIVATION_THRESHOLD, 0.8f32);
+
+        let graph = Rc::new(
+            RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical))
+        );
+        for i in 1..=9 { graph.borrow_mut().insert(&i); }
+        {
+            let mid_element = graph.borrow().search(&5).unwrap();
+            mid_element.borrow_mut().fuzzy_activate(1.0f32);
+            assert_eq!(mid_element.borrow().activation(), 1.0f32);
+            let mid_element_ref =  mid_element.borrow();
+
+            let (left_neighbour_ptr, left_neighbour_weight) = mid_element_ref.prev.as_ref().unwrap();
+            let left_neighbour = left_neighbour_ptr.upgrade().unwrap();
+            assert_eq!(*left_neighbour_weight, 0.875f32);
+            assert_eq!(left_neighbour.borrow().activation(), 0.875f32);
+            let left_neighbour_ref =  left_neighbour.borrow();
+
+            let (left_left_neighbour_ptr, left_left_neighbour_weight) = left_neighbour_ref.prev.as_ref().unwrap();
+            let left_left_neighbour = left_left_neighbour_ptr.upgrade().unwrap();
+            assert_eq!(*left_left_neighbour_weight, 0.875f32);
+            assert_eq!(left_left_neighbour.borrow().activation(), 0.765625f32);
+
+            let (right_neighbour_ptr, right_neighbour_weight) = mid_element_ref.next.as_ref().unwrap();
+            let right_neighbour = right_neighbour_ptr.upgrade().unwrap();
+            assert_eq!(*right_neighbour_weight, 0.875f32);
+            assert_eq!(right_neighbour.borrow().activation(), 0.875f32);
+            let right_neighbour_ref =  right_neighbour.borrow();
+
+            let (right_right_neighbour_ptr, right_right_neighbour_weight) = right_neighbour_ref.next.as_ref().unwrap();
+            let right_right_neighbour = right_right_neighbour_ptr.upgrade().unwrap();
+            assert_eq!(*right_right_neighbour_weight, 0.875f32);
+            assert_eq!(right_right_neighbour.borrow().activation(), 0.765625f32);
+
+            let second_element = graph.borrow().search(&2).unwrap();
+            assert_eq!(second_element.borrow().activation(), 0.0f32);
+            let eight_element = graph.borrow().search(&8).unwrap();
+            assert_eq!(eight_element.borrow().activation(), 0.0f32);
+
+            let element_min = graph.borrow().element_min.as_ref().unwrap().clone();
+            assert_eq!(element_min.borrow().activation(), 0.0f32);
+
+            let element_max = graph.borrow().element_max.as_ref().unwrap().clone();
+            assert_eq!(element_max.borrow().activation(), 0.0f32);
+        }
+
+        let mid_element = graph.borrow().search(&5).unwrap();
+        mid_element.borrow_mut().deactivate_neighbours();
+        assert_eq!(mid_element.borrow().activation(), 0.0f32);
+        let mid_element_ref =  mid_element.borrow();
+        
+        let (left_neighbour_ptr, _) = mid_element_ref.prev.as_ref().unwrap();
+        let left_neighbour = left_neighbour_ptr.upgrade().unwrap();
+        assert_eq!(left_neighbour.borrow().activation(), 0.0f32);
+        let left_neighbour_ref =  left_neighbour.borrow();
+
+        let (left_left_neighbour_ptr, _) = left_neighbour_ref.prev.as_ref().unwrap();
+        let left_left_neighbour = left_left_neighbour_ptr.upgrade().unwrap();
+        assert_eq!(left_left_neighbour.borrow().activation(), 0.0f32);
+
+        let (right_neighbour_ptr, _) = mid_element_ref.next.as_ref().unwrap();
+        let right_neighbour = right_neighbour_ptr.upgrade().unwrap();
+        assert_eq!(right_neighbour.borrow().activation(), 0.0f32);
+        let right_neighbour_ref =  right_neighbour.borrow();
+
+        let (right_right_neighbour_ptr, _) = right_neighbour_ref.next.as_ref().unwrap();
+        let right_right_neighbour = right_right_neighbour_ptr.upgrade().unwrap();
+        assert_eq!(right_right_neighbour.borrow().activation(), 0.0f32);
+
+        let second_element = graph.borrow().search(&2).unwrap();
+        assert_eq!(second_element.borrow().activation(), 0.0f32);
+        let eight_element = graph.borrow().search(&8).unwrap();
+        assert_eq!(eight_element.borrow().activation(), 0.0f32);
+
+        let element_min = graph.borrow().element_min.as_ref().unwrap().clone();
+        assert_eq!(element_min.borrow().activation(), 0.0f32);
+
+        let element_max = graph.borrow().element_max.as_ref().unwrap().clone();
+        assert_eq!(element_max.borrow().activation(), 0.0f32);
+    }
+
+    #[test]
+    fn simple_activate() {
+        let graph = Rc::new(
+            RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical))
+        );
+        for i in 1..=9 { graph.borrow_mut().insert(&i); }
+
+        let mid_element = graph.borrow().search(&5).unwrap();
+        mid_element.borrow_mut().simple_activate(1.0f32);
+        assert_eq!(mid_element.borrow().activation(), 1.0f32);
+        let mid_element_ref =  mid_element.borrow();
+
+        let (left_neighbour_ptr, left_neighbour_weight) = mid_element_ref.prev.as_ref().unwrap();
+        let left_neighbour = left_neighbour_ptr.upgrade().unwrap();
+        assert_eq!(*left_neighbour_weight, 0.875f32);
+        assert_eq!(left_neighbour.borrow().activation(), 0.0f32);
+        let left_neighbour_ref =  left_neighbour.borrow();
+
+        let (left_left_neighbour_ptr, left_left_neighbour_weight) = left_neighbour_ref.prev.as_ref().unwrap();
+        let left_left_neighbour = left_left_neighbour_ptr.upgrade().unwrap();
+        assert_eq!(*left_left_neighbour_weight, 0.875f32);
+        assert_eq!(left_left_neighbour.borrow().activation(), 0.0f32);
+
+        let (right_neighbour_ptr, right_neighbour_weight) = mid_element_ref.next.as_ref().unwrap();
+        let right_neighbour = right_neighbour_ptr.upgrade().unwrap();
+        assert_eq!(*right_neighbour_weight, 0.875f32);
+        assert_eq!(right_neighbour.borrow().activation(), 0.0f32);
+        let right_neighbour_ref =  right_neighbour.borrow();
+
+        let (right_right_neighbour_ptr, right_right_neighbour_weight) = right_neighbour_ref.next.as_ref().unwrap();
+        let right_right_neighbour = right_right_neighbour_ptr.upgrade().unwrap();
+        assert_eq!(*right_right_neighbour_weight, 0.875f32);
+        assert_eq!(right_right_neighbour.borrow().activation(), 0.0f32);
+
+        let second_element = graph.borrow().search(&2).unwrap();
+        assert_eq!(second_element.borrow().activation(), 0.0f32);
+        let eight_element = graph.borrow().search(&8).unwrap();
+        assert_eq!(eight_element.borrow().activation(), 0.0f32);
+
+        let element_min = graph.borrow().element_min.as_ref().unwrap().clone();
+        assert_eq!(element_min.borrow().activation(), 0.0f32);
+
+        let element_max = graph.borrow().element_max.as_ref().unwrap().clone();
+        assert_eq!(element_max.borrow().activation(), 0.0f32);
+    }
+
+    #[test]
+    fn connections_trait() {
+        let element_1: Rc<RefCell<Element<i32, 3>>> = Element::new(&1, &Rc::from("test"));
+        let element_2: Rc<RefCell<Element<i32, 3>>> = Element::new(&2, &Rc::from("test"));
+
+        let er = element_1.borrow_mut().connect_from(element_2.clone(), ConnectionKind::Defining);
+        assert!(er.is_err());
+
+        let ok = element_1.borrow_mut().connect_to(element_2.clone(), ConnectionKind::Defining);
+        assert!(ok.is_ok());
+        assert_eq!(element_1.borrow().defined_neurons().len(), 1);
+        let connection = ok.unwrap();
+        assert!(Rc::ptr_eq(&connection.borrow().to(), &(element_2 as Rc<RefCell<dyn Neuron>>)));
+
+        let er = element_1.borrow_mut().connect_to_connection(connection);
+        assert!(er.is_ok());
+
+        assert_eq!(element_1.borrow().defined_neurons().len(), 1);
     }
 }
