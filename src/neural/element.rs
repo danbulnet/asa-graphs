@@ -171,7 +171,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         }
     }
 
-    pub(crate) fn defined_neurons(&self) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
+    pub fn defined_neurons(&self) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
         let mut neurons = HashMap::new();
         for (_id, definition) in &self.definitions {
             let neuron = definition.borrow().to();
@@ -425,7 +425,7 @@ mod tests {
             connection.borrow().to().as_ptr() as *const () as usize, 
             element_2_ptr.as_ptr() as *const () as usize
         );
-        
+
         let activated = element_1_ptr.borrow_mut().activate(1.0f32, true, true);
         assert_eq!(activated.len(), 0);
         assert_eq!(element_1_ptr.borrow().activation(), 1.0f32);
