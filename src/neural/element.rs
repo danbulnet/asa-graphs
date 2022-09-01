@@ -89,12 +89,8 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
     ) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
         self.activation += signal;
 
-        let mut neurons = HashMap::new();
+        let mut neurons = self.defined_neurons();
 
-        for (_id, definition) in &self.definitions {
-            let neuron = definition.borrow().to();
-            neurons.insert(neuron.borrow().id(), neuron.clone());
-        }
 
         let mut element_activation = self.activation;
         if let Some(next) = &self.next {
@@ -102,10 +98,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             let mut weight = next.1;
             while element_activation > Self::INTERELEMENT_ACTIVATION_THRESHOLD {
                 element.borrow_mut().activate(element_activation * weight, false, false);
-                for (_id, definition) in &element.borrow().definitions {
-                    let neuron = definition.borrow().to();
-                    neurons.insert(neuron.borrow().id(), neuron.clone());
-                }
+                neurons.extend(element.borrow().defined_neurons());
 
                 let new_element = match &element.borrow().next {
                     Some(next) => {
@@ -125,10 +118,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             let mut weight = prev.1;
             while element_activation > Self::INTERELEMENT_ACTIVATION_THRESHOLD {
                 element.borrow_mut().activate(element_activation * weight, false, false);
-                for (_id, definition) in &element.borrow().definitions {
-                    let neuron = definition.borrow().to();
-                    neurons.insert(neuron.borrow().id(), neuron.clone());
-                }
+                neurons.extend(element.borrow().defined_neurons());
 
                 let new_element = match &element.borrow().prev {
                     Some(prev) => {
@@ -143,6 +133,14 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         }
 
         neurons
+    }
+
+    
+    pub(crate) fn simple_activate(
+        &mut self, signal: f32
+    )-> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
+        self.activation += signal;
+        self.defined_neurons()
     }
 
     pub(crate) fn deactivate_neighbours(&mut self) {
@@ -173,18 +171,13 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
         }
     }
 
-    pub(crate) fn simple_activate(
-        &mut self, signal: f32
-    )-> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
-        self.activation += signal;
-        self.defined_neurons()
-    }
-
     pub(crate) fn defined_neurons(&self) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
         let mut neurons = HashMap::new();
         for (_id, definition) in &self.definitions {
             let neuron = definition.borrow().to();
-            neurons.insert(neuron.borrow().id(), neuron.clone());
+            if !neuron.borrow().is_sensor() {
+                neurons.insert(neuron.borrow().id(), neuron.clone());
+            }
         }
         neurons
     }
@@ -430,7 +423,7 @@ mod tests {
         assert!(std::ptr::eq(connection.borrow().to().as_ptr(), element_2_ptr.as_ptr()));
 
         let activated = element_1_ptr.borrow_mut().activate(1.0f32, true, true);
-        assert_eq!(activated.len(), 1);
+        assert_eq!(activated.len(), 0);
         assert_eq!(element_1_ptr.borrow().activation(), 1.0f32);
         assert_eq!(element_2_ptr.borrow().activation(), 0.0f32);
 
@@ -601,13 +594,13 @@ mod tests {
 
         let ok = element_1.borrow_mut().connect_to(element_2.clone(), ConnectionKind::Defining);
         assert!(ok.is_ok());
-        assert_eq!(element_1.borrow().defined_neurons().len(), 1);
+        assert_eq!(element_1.borrow().defined_neurons().len(), 0);
         let connection = ok.unwrap();
         assert!(Rc::ptr_eq(&connection.borrow().to(), &(element_2 as Rc<RefCell<dyn Neuron>>)));
 
         let er = element_1.borrow_mut().connect_to_connection(connection);
         assert!(er.is_ok());
 
-        assert_eq!(element_1.borrow().defined_neurons().len(), 1);
+        assert_eq!(element_1.borrow().defined_neurons().len(), 0);
     }
 }
