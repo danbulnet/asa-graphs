@@ -269,8 +269,9 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
     ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>, String> {
         match to_connection.borrow().kind() {
             ConnectionKind::Defining => {
-                let to_neuron = to_connection.borrow().to().clone();
-                let connection_id = ConnectionID { from: self.id(), to: to_neuron.borrow().id() };
+                let to_neuron_ptr = to_connection.borrow().to().as_ptr();
+                let to_neuorn_id = unsafe { (&*to_neuron_ptr).id() };
+                let connection_id = ConnectionID { from: self.id(), to: to_neuorn_id };
                 self.definitions.insert(connection_id, to_connection.clone());
                 Ok(to_connection.clone())
             },
