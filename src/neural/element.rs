@@ -265,14 +265,14 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
     }
 
     fn connect_to_connection(
-        &mut self, to: Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>
+        &mut self, to_connection: Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>
     ) -> Result<Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>, String> {
-        match to.borrow().kind() {
+        match to_connection.borrow().kind() {
             ConnectionKind::Defining => {
-                let to_neuron = to.borrow().to().clone();
+                let to_neuron = to_connection.borrow().to().clone();
                 let connection_id = ConnectionID { from: self.id(), to: to_neuron.borrow().id() };
-                self.definitions.insert(connection_id, to.clone());
-                Ok(to.clone())
+                self.definitions.insert(connection_id, to_connection.clone());
+                Ok(to_connection.clone())
             },
             _ => {
                 let msg = "only defining connection to element can be created for asa-graphs";
@@ -291,7 +291,7 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
     }
 
     fn connect_from_connection(
-        &mut self, _from: Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>
+        &mut self, _from_connection: Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>
     ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>, String> {
         let msg = "only defining connection to neuron can be created for asa-graphs element";
         log::error!("{}", msg);
