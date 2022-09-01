@@ -25,7 +25,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
     pub(crate) self_ptr: Weak<RefCell<Element<Key, ORDER>>>,
     pub next: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
     pub prev: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
-    pub definitions: HashMap<ConnectionID, Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>>,
+    pub definitions: HashMap<ConnectionID, Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>>,
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
@@ -245,11 +245,11 @@ impl<Key, const ORDER: usize> NeuronConnect for Element<Key, ORDER>
 where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); ORDER + 1]: {
     fn connect_to(
         &mut self, to: Rc<RefCell<dyn Neuron>>, kind: ConnectionKind
-    ) -> Result<Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>, String> {
+    ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>, String> {
         match kind {
             ConnectionKind::Defining => {
                 let connection = Rc::new(RefCell::new(DefiningConnection::new(
-                    self.self_ptr.upgrade().unwrap(), 
+                    self.self_ptr.upgrade().unwrap() as Rc<RefCell<dyn Neuron>>, 
                     to.clone()
                 )));
                 let connection_id = ConnectionID { from: self.id(), to: to.borrow().id() };
@@ -265,8 +265,8 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
     }
 
     fn connect_to_connection(
-        &mut self, to_connection: Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>
-    ) -> Result<Rc<RefCell<dyn Connection<From = Self, To = dyn Neuron>>>, String> {
+        &mut self, to_connection: Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>
+    ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>, String> {
         match to_connection.borrow().kind() {
             ConnectionKind::Defining => {
                 let to_neuron = to_connection.borrow().to().clone();
@@ -284,15 +284,15 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
 
     fn connect_from(
         &mut self, _from: Rc<RefCell<dyn Neuron>>, _kind: ConnectionKind
-    ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>, String> {
+    ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>, String> {
         let msg = "only defining connection to neuron can be created for asa-graphs element";
         log::error!("{}", msg);
         Err(msg.to_string())
     }
 
     fn connect_from_connection(
-        &mut self, _from_connection: Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>
-    ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = Self>>>, String> {
+        &mut self, _from_connection: Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>
+    ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>, String> {
         let msg = "only defining connection to neuron can be created for asa-graphs element";
         log::error!("{}", msg);
         Err(msg.to_string())
@@ -416,9 +416,16 @@ mod tests {
         
         let connection = element_1_ptr
             .borrow_mut().connect_to(element_2_ptr.clone(), ConnectionKind::Defining).unwrap();
-        assert!(std::ptr::eq(connection.borrow().from().as_ptr(), element_1_ptr.as_ptr()));
-        assert!(std::ptr::eq(connection.borrow().to().as_ptr(), element_2_ptr.as_ptr()));
-
+        
+        assert_eq!(
+            connection.borrow().from().as_ptr() as *const () as usize, 
+            element_1_ptr.as_ptr() as *const () as usize
+        );
+        assert_eq!(
+            connection.borrow().to().as_ptr() as *const () as usize, 
+            element_2_ptr.as_ptr() as *const () as usize
+        );
+        
         let activated = element_1_ptr.borrow_mut().activate(1.0f32, true, true);
         assert_eq!(activated.len(), 0);
         assert_eq!(element_1_ptr.borrow().activation(), 1.0f32);
