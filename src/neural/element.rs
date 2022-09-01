@@ -234,11 +234,8 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
         if propagate_horizontal { self.deactivate_neighbours(); }
 
         if propagate_vertical {
-            for (_id, definition) in &self.definitions {
-                let neuron = definition.borrow().to().clone();
-                if !neuron.borrow().is_sensor() {
-                    neuron.borrow_mut().deactivate(propagate_horizontal, propagate_vertical);
-                }
+            for (_id, neuron) in &self.defined_neurons() {
+                neuron.borrow_mut().deactivate(propagate_horizontal, propagate_vertical);
             }
         }
     }
