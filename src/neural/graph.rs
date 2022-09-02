@@ -1,13 +1,11 @@
 use std::{
-    fmt::Display,
     rc::Rc,
     cell::RefCell,
     collections::HashMap
 };
 
 use bionet_common::{
-    sensor::{ Sensor, SensorMarker },
-    distances::Distance,
+    sensor::{ Sensor, SensorMarker, SensorData },
     neuron::{ Neuron, NeuronID },
     data::DataCategory
 };
@@ -18,7 +16,7 @@ use super::{
 };
 
 pub struct ASAGraph<Key, const ORDER: usize = 25>
-where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
+where Key: SensorData + 'static, [(); ORDER + 1]: {
     pub name: Rc<str>,
     pub data_category: DataCategory,
     pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
@@ -29,24 +27,24 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
 }
 
 impl<Key, const ORDER: usize> Sensor for ASAGraph<Key, ORDER> 
-where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
-    type DataType = Key;
+where Key: SensorData + 'static, [(); ORDER + 1]: {
+    type Data = Key;
 
     fn name(&self) -> &str { &*self.name }
 
     fn data_category(&self) -> DataCategory { self.data_category }
 
-    fn insert(&mut self, key: &Key) -> Rc<RefCell<dyn Neuron>> {
+    fn insert(&mut self, key: &Self::Data) -> Rc<RefCell<dyn Neuron>> {
         // self.insert(key.downcast_ref::<Key>().unwrap())
         self.insert(key)
     }
 
-    fn search(&self, key: &Key) -> Option<Rc<RefCell<dyn Neuron>>> { 
+    fn search(&self, key: &Self::Data) -> Option<Rc<RefCell<dyn Neuron>>> { 
         Some(self.search(key).unwrap() as Rc<RefCell<dyn Neuron>>) 
     }
 
     fn activate(
-        &mut self, item: &Key, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
+        &mut self, item: &Self::Data, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<HashMap<NeuronID, Rc<RefCell<dyn Neuron>>>, String> {
         let element = match self.search(item) {
             Some(e) => e,
@@ -84,7 +82,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
     }
 
     fn deactivate(
-        &mut self, item: &Key, propagate_horizontal: bool, propagate_vertical: bool
+        &mut self, item: &Self::Data, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<(), String> {
         let element = match self.search(item) {
             Some(e) => e,
@@ -118,10 +116,10 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
 }
 
 impl<Key, const ORDER: usize> SensorMarker for ASAGraph<Key, ORDER> 
-where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {}
+where Key: SensorData, [(); ORDER + 1]: {}
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
-where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]: {
     pub fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");
@@ -424,7 +422,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
 }
 
 impl<'a, Key, const ORDER: usize> IntoIterator for &'a ASAGraph<Key, ORDER> 
-where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
+where Key: SensorData + 'static, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     type IntoIter = ASAGraphIntoIterator<'a, Key, ORDER>;
 
@@ -440,13 +438,13 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
 }
 
 pub struct ASAGraphIntoIterator<'a, Key, const ORDER: usize = 25>
-where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
+where Key: SensorData + 'static, [(); ORDER + 1]: {
     graph: &'a ASAGraph<Key, ORDER>,
     index: Option<Rc<RefCell<Element<Key, ORDER>>>>
 }
 
 impl<'a, Key, const ORDER: usize> Iterator for ASAGraphIntoIterator<'a, Key, ORDER> 
-where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
+where Key: SensorData + 'static, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     fn next(&mut self) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
         let next_option;

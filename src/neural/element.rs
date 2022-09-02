@@ -13,7 +13,8 @@ use bionet_common::{
         ConnectionKind,
         ConnectionID,
         defining_connection::DefiningConnection
-    }
+    },
+    sensor::SensorData
 };
 
 pub struct Element<Key, const ORDER: usize>
@@ -184,7 +185,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
 }
 
 impl<Key, const ORDER: usize> Neuron for Element<Key, ORDER> 
-where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); ORDER + 1]: {
+where Key: SensorData + 'static, [(); ORDER + 1]: {
     fn id(&self) -> NeuronID {
         NeuronID {
             id: Rc::from(self.key.to_string()),
@@ -242,7 +243,7 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
 }
 
 impl<Key, const ORDER: usize> NeuronConnect for Element<Key, ORDER> 
-where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); ORDER + 1]: {
+where Key: SensorData + 'static, [(); ORDER + 1]: {
     fn connect_to(
         &mut self, to: Rc<RefCell<dyn Neuron>>, kind: ConnectionKind
     ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>, String> {
@@ -301,7 +302,7 @@ where Key: Clone + Display + Distance + PartialOrd + PartialEq + 'static, [(); O
 }
 
 impl<Key, const ORDER: usize> Display for Element<Key, ORDER> 
-where Key: Clone + Display + Distance + PartialOrd + PartialEq, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]: {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "[{}:{}]", &self.key, &self.counter)
     }

@@ -5,14 +5,14 @@ use std::{
 };
 
 use bionet_common::{
-    distances::Distance,
-    algorithms::SearchAlgorithm
+    algorithms::SearchAlgorithm,
+    sensor::SensorData
 };
 
 use super::element::Element;
 
 pub struct Node<Key, const ORDER: usize>
-where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
+where Key: SensorData + 'static, [(); ORDER + 1]: {
     pub(crate) size: usize,
     pub(crate) is_leaf: bool,
     pub(crate) parent: Option<Weak<RefCell<Node<Key, ORDER>>>>,
@@ -22,7 +22,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
 }
 
 impl<Key, const ORDER: usize> Node<Key, ORDER> 
-where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]: {
     pub fn new(
         is_leaf: bool, parent: Option<Weak<RefCell<Node<Key, ORDER>>>>
     ) -> Node<Key, ORDER> {
@@ -277,7 +277,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
 }
 
 impl<Key, const ORDER: usize> Display for Node<Key, ORDER> 
-where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]: {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let mut node: String = format!(
             "<==leaf:{}, size:{}, keys:", self.is_leaf, self.size
