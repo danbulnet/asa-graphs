@@ -37,10 +37,6 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
 
     fn data_category(&self) -> DataCategory { self.data_category }
 
-    fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> { 
-        Self::new(name, data_category)
-    }
-
     fn insert(&mut self, key: &Key) -> Rc<RefCell<Element<Key, ORDER>>> {
         self.insert(key)
     }
@@ -134,6 +130,13 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:
             key_min: None,
             key_max: None
         }
+    }
+
+    pub fn new_rc(name: &str, data_category: DataCategory) -> Rc<RefCell<ASAGraph<Key, ORDER>>> {
+        if ORDER < 3 {
+            panic!("Graph order must be >= 3");
+        }
+        Rc::new(RefCell::new(ASAGraph::new(name, data_category)))
     }
 
     pub fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
