@@ -6,7 +6,7 @@ use std::{
 };
 
 use bionet_common::{
-    sensor::Sensor,
+    sensor::{ Sensor, SensorMarker },
     distances::Distance,
     neuron::{ Neuron, NeuronID },
     data::DataCategory
@@ -30,18 +30,20 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
 
 impl<Key, const ORDER: usize> Sensor for ASAGraph<Key, ORDER> 
 where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
-    type ElementType = Element<Key, ORDER>;
     type DataType = Key;
 
     fn name(&self) -> &str { &*self.name }
 
     fn data_category(&self) -> DataCategory { self.data_category }
 
-    fn insert(&mut self, key: &Key) -> Rc<RefCell<Element<Key, ORDER>>> {
+    fn insert(&mut self, key: &Key) -> Rc<RefCell<dyn Neuron>> {
+        // self.insert(key.downcast_ref::<Key>().unwrap())
         self.insert(key)
     }
 
-    fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> { self.search(key) }
+    fn search(&self, key: &Key) -> Option<Rc<RefCell<dyn Neuron>>> { 
+        Some(self.search(key).unwrap() as Rc<RefCell<dyn Neuron>>) 
+    }
 
     fn activate(
         &mut self, item: &Key, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
@@ -82,7 +84,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
     }
 
     fn deactivate(
-        &mut self, item: &Self::DataType, propagate_horizontal: bool, propagate_vertical: bool
+        &mut self, item: &Key, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<(), String> {
         let element = match self.search(item) {
             Some(e) => e,
@@ -114,6 +116,9 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
         }
     }
 }
+
+impl<Key, const ORDER: usize> SensorMarker for ASAGraph<Key, ORDER> 
+where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {}
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
 where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]: {
