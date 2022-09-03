@@ -5,10 +5,9 @@ use std::{
 };
 
 use bionet_common::{
-    sensor::{ Sensor, SensorData, SensorDataType },
+    sensor::{ Sensor, SensorData },
     neuron::{ Neuron, NeuronID },
-    data::DataCategory,
-    distances::Distance
+    data::DataCategory
 };
 
 use super::{
@@ -36,7 +35,6 @@ where Key: SensorData, [(); ORDER + 1]: {
     fn data_category(&self) -> DataCategory { self.data_category }
 
     fn insert(&mut self, key: &Key) -> Rc<RefCell<dyn Neuron>> {
-        // self.insert(key.downcast_ref::<Key>().unwrap())
         self.insert(key)
     }
 
