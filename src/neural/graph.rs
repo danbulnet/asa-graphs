@@ -16,7 +16,7 @@ use super::{
 };
 
 pub struct ASAGraph<Key, const ORDER: usize = 25>
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     pub name: Rc<str>,
     pub data_category: DataCategory,
     pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
@@ -27,7 +27,7 @@ where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> SensorDynamic for ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone, [(); ORDER + 1]: {
     type Data = Key;
 
     fn name(&self) -> &str { &*self.name }
@@ -121,7 +121,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone, [(); ORDER + 1]: {
     pub fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");
@@ -424,7 +424,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
 }
 
 impl<'a, Key, const ORDER: usize> IntoIterator for &'a ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     type IntoIter = ASAGraphIntoIterator<'a, Key, ORDER>;
 
@@ -440,13 +440,13 @@ where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
 }
 
 pub struct ASAGraphIntoIterator<'a, Key, const ORDER: usize = 25>
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     graph: &'a ASAGraph<Key, ORDER>,
     index: Option<Rc<RefCell<Element<Key, ORDER>>>>
 }
 
 impl<'a, Key, const ORDER: usize> Iterator for ASAGraphIntoIterator<'a, Key, ORDER> 
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     fn next(&mut self) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
         let next_option;
