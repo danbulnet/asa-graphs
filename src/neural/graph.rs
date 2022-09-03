@@ -5,7 +5,7 @@ use std::{
 };
 
 use bionet_common::{
-    sensor::{ SensorDynamic, SensorDataDynamicMarker },
+    sensor::{ SensorDynamic, SensorDataDynamic, SensorDataDynamicMarker, SensorDynamicBuilder },
     neuron::{ Neuron, NeuronID },
     data::DataCategory
 };
@@ -16,7 +16,7 @@ use super::{
 };
 
 pub struct ASAGraph<Key, const ORDER: usize = 25>
-where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
     pub name: Rc<str>,
     pub data_category: DataCategory,
     pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
@@ -27,7 +27,7 @@ where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [
 }
 
 impl<Key, const ORDER: usize> SensorDynamic for ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
     type Data = Key;
 
     fn name(&self) -> &str { &*self.name }
@@ -120,8 +120,16 @@ where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone, [(); ORDER 
     }
 }
 
+impl<Key, const ORDER: usize> SensorDynamicBuilder<Key> for ASAGraph<Key, ORDER> 
+where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
+    fn new(name: &str, data_category: DataCategory)
+    -> Rc<RefCell<dyn SensorDynamic<Data = Key>>> {
+        ASAGraph::<Key, ORDER>::new_rc(name, data_category)
+    }
+}
+
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
     pub fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");
@@ -424,7 +432,7 @@ where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone, [(); ORDER 
 }
 
 impl<'a, Key, const ORDER: usize> IntoIterator for &'a ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     type IntoIter = ASAGraphIntoIterator<'a, Key, ORDER>;
 
@@ -440,13 +448,13 @@ where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [
 }
 
 pub struct ASAGraphIntoIterator<'a, Key, const ORDER: usize = 25>
-where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
     graph: &'a ASAGraph<Key, ORDER>,
     index: Option<Rc<RefCell<Element<Key, ORDER>>>>
 }
 
 impl<'a, Key, const ORDER: usize> Iterator for ASAGraphIntoIterator<'a, Key, ORDER> 
-where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     fn next(&mut self) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
         let next_option;
@@ -473,7 +481,7 @@ where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [
 
 #[cfg(test)]
 pub mod tests {
-    use bionet_common::sensor::SensorDataDynamic;
+    use bionet_common::sensor::SensorDynamicBuilder;
     use rand::Rng;
     use std::{ time::Instant };
 
@@ -756,5 +764,14 @@ pub mod tests {
             let n = i + 1;
             if n == 8 { assert_eq!(activation, 1.0f32) } else { assert_eq!(activation, 0.0f32) }
         }
+    }
+
+    #[test]
+    fn test_sensor_dynamic_builder() {
+        let sensor = <crate::neural::graph::ASAGraph::<i32, 25> as SensorDynamicBuilder::<i32>>::new(
+            "test", DataCategory::Numerical
+        );
+
+        assert_eq!(sensor.borrow().name(), "test");
     }
 }

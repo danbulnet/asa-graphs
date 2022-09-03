@@ -12,7 +12,7 @@ use bionet_common::{
 use super::element::Element;
 
 pub struct Node<Key, const ORDER: usize>
-where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
     pub(crate) size: usize,
     pub(crate) is_leaf: bool,
     pub(crate) parent: Option<Weak<RefCell<Node<Key, ORDER>>>>,
@@ -22,7 +22,7 @@ where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone + 'static, [
 }
 
 impl<Key, const ORDER: usize> Node<Key, ORDER> 
-where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
     pub fn new(
         is_leaf: bool, parent: Option<Weak<RefCell<Node<Key, ORDER>>>>
     ) -> Node<Key, ORDER> {
@@ -277,7 +277,7 @@ where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone, [(); ORDER 
 }
 
 impl<Key, const ORDER: usize> Display for Node<Key, ORDER> 
-where Key: SensorDataDynamicMarker + PartialEq + PartialOrd + Clone, [(); ORDER + 1]: {
+where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let mut node: String = format!(
             "<==leaf:{}, size:{}, keys:", self.is_leaf, self.size
