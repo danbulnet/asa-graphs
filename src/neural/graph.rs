@@ -5,7 +5,7 @@ use std::{
 };
 
 use bionet_common::{
-    sensor::{ Sensor, SensorData, SensorDataMarker },
+    sensor::{ Sensor, SensorData },
     neuron::{ Neuron, NeuronID },
     data::DataCategory
 };
@@ -16,7 +16,7 @@ use super::{
 };
 
 pub struct ASAGraph<Key, const ORDER: usize = 25>
-where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorData + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     pub name: Rc<str>,
     pub data_category: DataCategory,
     pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
@@ -27,7 +27,7 @@ where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Sensor for ASAGraph<Key, ORDER> 
-where Key: SensorData + SensorDataMarker, [(); ORDER + 1]: {
+where Key: SensorData + PartialEq + PartialOrd + Clone, [(); ORDER + 1]: {
     type Data = Key;
 
     fn name(&self) -> &str { &*self.name }
@@ -35,16 +35,21 @@ where Key: SensorData + SensorDataMarker, [(); ORDER + 1]: {
     fn data_category(&self) -> DataCategory { self.data_category }
 
     fn insert(&mut self, key: &Key) -> Rc<RefCell<dyn Neuron>> {
-        self.insert(key)
+        self.insert(key.any().downcast_ref::<Key>().unwrap())
     }
 
     fn search(&self, key: &Key) -> Option<Rc<RefCell<dyn Neuron>>> { 
-        Some(self.search(key).unwrap() as Rc<RefCell<dyn Neuron>>) 
+        Some(
+            self.search(
+                key.any().downcast_ref::<Key>().unwrap()
+            ).unwrap() as Rc<RefCell<dyn Neuron>>
+        )
     }
 
     fn activate(
         &mut self, item: &Key, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<HashMap<NeuronID, Rc<RefCell<dyn Neuron>>>, String> {
+        let item = item.any().downcast_ref::<Key>().unwrap();
         let element = match self.search(item) {
             Some(e) => e,
             None => { 
@@ -83,6 +88,7 @@ where Key: SensorData + SensorDataMarker, [(); ORDER + 1]: {
     fn deactivate(
         &mut self, item: &Key, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<(), String> {
+        let item = item.any().downcast_ref::<Key>().unwrap();
         let element = match self.search(item) {
             Some(e) => e,
             None => {
@@ -115,7 +121,7 @@ where Key: SensorData + SensorDataMarker, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
-where Key: SensorData + SensorDataMarker, [(); ORDER + 1]: {
+where Key: SensorData + PartialEq + PartialOrd + Clone, [(); ORDER + 1]: {
     pub fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");
@@ -418,7 +424,7 @@ where Key: SensorData + SensorDataMarker, [(); ORDER + 1]: {
 }
 
 impl<'a, Key, const ORDER: usize> IntoIterator for &'a ASAGraph<Key, ORDER> 
-where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorData + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     type IntoIter = ASAGraphIntoIterator<'a, Key, ORDER>;
 
@@ -434,13 +440,13 @@ where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
 }
 
 pub struct ASAGraphIntoIterator<'a, Key, const ORDER: usize = 25>
-where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorData + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     graph: &'a ASAGraph<Key, ORDER>,
     index: Option<Rc<RefCell<Element<Key, ORDER>>>>
 }
 
 impl<'a, Key, const ORDER: usize> Iterator for ASAGraphIntoIterator<'a, Key, ORDER> 
-where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorData + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     fn next(&mut self) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
         let next_option;
@@ -467,6 +473,7 @@ where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
 
 #[cfg(test)]
 pub mod tests {
+    use bionet_common::sensor::SensorData;
     use rand::Rng;
     use std::{ time::Instant };
 

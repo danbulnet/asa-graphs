@@ -14,11 +14,11 @@ use bionet_common::{
         ConnectionID,
         defining_connection::DefiningConnection
     },
-    sensor::{ SensorData, SensorDataMarker }
+    sensor::SensorData
 };
 
 pub struct Element<Key, const ORDER: usize>
-where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorData + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     pub key: Key,
     pub counter: usize,
     pub activation: f32,
@@ -30,7 +30,7 @@ where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
-where Key: SensorData + SensorDataMarker, [(); ORDER + 1]:  {
+where Key: SensorData + PartialEq + PartialOrd + Clone, [(); ORDER + 1]:  {
     pub const INTERELEMENT_ACTIVATION_THRESHOLD: f32 = 0.8;
 
     pub fn new(key: &Key, parent: &Rc<str>)
@@ -185,7 +185,7 @@ where Key: SensorData + SensorDataMarker, [(); ORDER + 1]:  {
 }
 
 impl<Key, const ORDER: usize> Neuron for Element<Key, ORDER> 
-where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorData + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     fn id(&self) -> NeuronID {
         NeuronID {
             id: Rc::from(self.key.to_string()),
@@ -243,7 +243,7 @@ where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> NeuronConnect for Element<Key, ORDER> 
-where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorData + PartialEq + PartialOrd + Clone + 'static, [(); ORDER + 1]: {
     fn connect_to(
         &mut self, to: Rc<RefCell<dyn Neuron>>, kind: ConnectionKind
     ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>, String> {
@@ -302,7 +302,7 @@ where Key: SensorData + SensorDataMarker + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Display for Element<Key, ORDER> 
-where Key: SensorData + SensorDataMarker, [(); ORDER + 1]: {
+where Key: SensorData + PartialEq + PartialOrd + Clone, [(); ORDER + 1]: {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "[{}:{}]", &self.key, &self.counter)
     }
