@@ -5,9 +5,10 @@ use std::{
 };
 
 use bionet_common::{
-    sensor::{ Sensor, SensorMarker, SensorData },
+    sensor::{ Sensor, SensorData, SensorDataType },
     neuron::{ Neuron, NeuronID },
-    data::DataCategory
+    data::DataCategory,
+    distances::Distance
 };
 
 use super::{
@@ -27,24 +28,24 @@ where Key: SensorData + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Sensor for ASAGraph<Key, ORDER> 
-where Key: SensorData + 'static, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]: {
     type Data = Key;
 
     fn name(&self) -> &str { &*self.name }
 
     fn data_category(&self) -> DataCategory { self.data_category }
 
-    fn insert(&mut self, key: &Self::Data) -> Rc<RefCell<dyn Neuron>> {
+    fn insert(&mut self, key: &Key) -> Rc<RefCell<dyn Neuron>> {
         // self.insert(key.downcast_ref::<Key>().unwrap())
         self.insert(key)
     }
 
-    fn search(&self, key: &Self::Data) -> Option<Rc<RefCell<dyn Neuron>>> { 
+    fn search(&self, key: &Key) -> Option<Rc<RefCell<dyn Neuron>>> { 
         Some(self.search(key).unwrap() as Rc<RefCell<dyn Neuron>>) 
     }
 
     fn activate(
-        &mut self, item: &Self::Data, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
+        &mut self, item: &Key, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<HashMap<NeuronID, Rc<RefCell<dyn Neuron>>>, String> {
         let element = match self.search(item) {
             Some(e) => e,
@@ -82,7 +83,7 @@ where Key: SensorData + 'static, [(); ORDER + 1]: {
     }
 
     fn deactivate(
-        &mut self, item: &Self::Data, propagate_horizontal: bool, propagate_vertical: bool
+        &mut self, item: &Key, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<(), String> {
         let element = match self.search(item) {
             Some(e) => e,
@@ -114,9 +115,6 @@ where Key: SensorData + 'static, [(); ORDER + 1]: {
         }
     }
 }
-
-impl<Key, const ORDER: usize> SensorMarker for ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]: {}
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
 where Key: SensorData, [(); ORDER + 1]: {

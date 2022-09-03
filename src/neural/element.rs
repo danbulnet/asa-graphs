@@ -18,7 +18,7 @@ use bionet_common::{
 };
 
 pub struct Element<Key, const ORDER: usize>
-where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); ORDER + 1]: {
+where Key: SensorData + 'static, [(); ORDER + 1]: {
     pub key: Key,
     pub counter: usize,
     pub activation: f32,
@@ -30,7 +30,7 @@ where Key: Clone + Display + PartialOrd + PartialEq + Distance + 'static, [(); O
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
-where Key: Clone + Display + PartialOrd + PartialEq + Distance, [(); ORDER + 1]:  {
+where Key: SensorData, [(); ORDER + 1]:  {
     pub const INTERELEMENT_ACTIVATION_THRESHOLD: f32 = 0.8;
 
     pub fn new(key: &Key, parent: &Rc<str>)
