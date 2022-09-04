@@ -57,25 +57,25 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
             None => { 
                 match self.data_category {
                     DataCategory::Categorical => {
-                        log::error!("activating missing categorical sensory neuron {:?}", item);
+                        log::error!("activating missing categorical sensory neuron {}", item);
                         return Err(
-                            format!("activating missing categorical sensory neuron {:?}", item)
+                            format!("activating missing categorical sensory neuron {}", item)
                         )
                     },
                     DataCategory::Numerical | DataCategory::Ordinal => {
                         if propagate_horizontal {
                             log::warn!(
-                                "activating missing non-categorical sensory neuron {:?}, inserting",
+                                "activating missing non-categorical sensory neuron {}, inserting",
                                 item
                             );
                             self.insert(&item)
                         } else {
                             log::error!(
-                                "activating missing non-categorical sensory neuron {:?} with {}",
+                                "activating missing non-categorical sensory neuron {} with {}",
                                 item, "propagate_horizontal=false"
                             );
                             return Err(format!(
-                                "activating missing non-categorical sensory neuron {:?} with {}",
+                                "activating missing non-categorical sensory neuron {} with {}",
                                 item, "propagate_horizontal=false"
                             ))
                         }
@@ -94,8 +94,8 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
         let element = match self.search(item) {
             Some(e) => e,
             None => {
-                log::error!("deactivating non-existing sensory neuron {:?}", item);
-                return Err(format!("deactivating non-existing sensory neuron {:?}", item))
+                log::error!("deactivating non-existing sensory neuron {}", item);
+                return Err(format!("deactivating non-existing sensory neuron {}", item))
             }
         };
 
@@ -281,7 +281,7 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
                 print!("||");
                 for j in 0..(node_size) {
                     let element = node.borrow().elements[j].as_ref().unwrap().clone();
-                    print!("{:?}:{}|", &element.borrow().key, element.borrow().counter);
+                    print!("{}:{}|", &element.borrow().key, element.borrow().counter);
                     if !node.borrow().is_leaf {
                         queue[height + 1].push(node.borrow().children[j].as_ref().unwrap().clone());
                     }

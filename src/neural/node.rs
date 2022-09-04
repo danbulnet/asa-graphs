@@ -286,7 +286,7 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
         );
         for key in &self.keys {
             let element: String = match key.as_ref() {
-                Some(k) => format!("({:?})", k),
+                Some(k) => format!("({k})"),
                 None => "()".to_string()
             };
             node.push_str(&element);
