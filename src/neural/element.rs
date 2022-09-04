@@ -6,7 +6,6 @@ use std::{
 };
 
 use bionet_common::{
-    distances::Distance,
     neuron::{ Neuron, NeuronConnect, NeuronID },
     connection::{ 
         Connection, 

@@ -5,7 +5,7 @@ use std::{
 };
 
 use bionet_common::{
-    sensor::{ SensorDynamic, SensorDataDynamic, SensorDataDynamicMarker, SensorDynamicBuilder },
+    sensor::{ SensorDynamic, SensorDataDynamicMarker, SensorDynamicBuilder },
     neuron::{ Neuron, NeuronID },
     data::DataCategory
 };
