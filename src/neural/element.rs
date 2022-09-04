@@ -188,7 +188,7 @@ impl<Key, const ORDER: usize> Neuron for Element<Key, ORDER>
 where Key: SensorDataDynamic, [(); ORDER + 1]: {
     fn id(&self) -> NeuronID {
         NeuronID {
-            id: Rc::from(self.key.to_string()),
+            id: Rc::from(format!("{:?}", self.key)),
             parent_id: self.parent.clone()
         }
     }
@@ -304,7 +304,7 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
 impl<Key, const ORDER: usize> Display for Element<Key, ORDER> 
 where Key: SensorDataDynamic, [(); ORDER + 1]: {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "[{}:{}]", &self.key, &self.counter)
+        write!(f, "[{:?}:{}]", &self.key, &self.counter)
     }
 }
 
