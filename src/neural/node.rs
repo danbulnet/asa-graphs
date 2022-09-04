@@ -1,18 +1,20 @@
 use std::{
     fmt::{ Display, Formatter, Result },
     rc::{ Rc, Weak },
-    cell::{ RefCell, Ref, RefMut }
+    cell::{ RefCell, Ref, RefMut },
+    cmp::Ordering::*
 };
 
 use bionet_common::{
     algorithms::SearchAlgorithm,
-    sensor::SensorDataDynamicMarker
+    sensor::SensorDataDynamic
 };
 
 use super::element::Element;
 
+#[derive(Clone)]
 pub struct Node<Key, const ORDER: usize>
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     pub(crate) size: usize,
     pub(crate) is_leaf: bool,
     pub(crate) parent: Option<Weak<RefCell<Node<Key, ORDER>>>>,
@@ -22,7 +24,7 @@ where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Node<Key, ORDER> 
-where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     pub fn new(
         is_leaf: bool, parent: Option<Weak<RefCell<Node<Key, ORDER>>>>
     ) -> Node<Key, ORDER> {
@@ -41,7 +43,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
         match algorithm {
             SearchAlgorithm::LeftSearch => {
                 for i in 0..self.size {
-                    if self.keys[i].as_ref().unwrap() == key { 
+                    if self.keys[i].as_ref().unwrap().equals(key) { 
                         return Some(self.elements[i].as_ref().unwrap().as_ref().borrow()) 
                     }
                 }
@@ -49,7 +51,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
             },
             SearchAlgorithm::RightSearch => {
                 for i in (0..self.size).rev() {
-                    if self.keys[i].as_ref().unwrap() == key { 
+                    if self.keys[i].as_ref().unwrap().equals(key) { 
                         return Some(self.elements[i].as_ref().unwrap().as_ref().borrow()) 
                     }
                 }
@@ -61,9 +63,9 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
                 while left_index <= right_index {
                     let mid_index = left_index + (right_index - left_index) / 2;
                     let mid_key = self.keys[mid_index].as_ref().unwrap();
-                    if mid_key < key {
+                    if mid_key.partial_compare(key) == Some(Less) {
                         left_index = mid_index + 1;
-                    } else if mid_key > key {
+                    } else if mid_key.partial_compare(key) == Some(Greater) {
                         right_index = mid_index - 1;
                     } else {
                         return Some(
@@ -81,7 +83,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
         match algorithm {
             SearchAlgorithm::LeftSearch => {
                 for i in 0..self.size {
-                    if self.keys[i].as_ref().unwrap() == key { 
+                    if self.keys[i].as_ref().unwrap().equals(key) { 
                         return Some(self.elements[i].as_ref().unwrap().as_ref().borrow_mut()) 
                     }
                 }
@@ -89,7 +91,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
             },
             SearchAlgorithm::RightSearch => {
                 for i in (0..self.size).rev() {
-                    if self.keys[i].as_ref().unwrap() == key { 
+                    if self.keys[i].as_ref().unwrap().equals(key) { 
                         return Some(self.elements[i].as_ref().unwrap().as_ref().borrow_mut()) 
                     }
                 }
@@ -101,9 +103,9 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
                 while left_index <= right_index {
                     let mid_index = left_index + (right_index - left_index) / 2;
                     let mid_key = self.keys[mid_index].as_ref().unwrap();
-                    if mid_key < key {
+                    if mid_key.partial_compare(key) == Some(Less) {
                         left_index = mid_index + 1;
-                    } else if mid_key > key {
+                    } else if mid_key.partial_compare(key) == Some(Greater) {
                         right_index = mid_index - 1;
                     } else {
                         return Some(
@@ -170,14 +172,14 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
         if left_search {
             index = 0usize;
             let mut current_key = self.keys[index].as_ref().unwrap();
-            while index < self.size - 1 && key > current_key {
+            while index < self.size - 1 && key.partial_compare(current_key) == Some(Greater) {
                 index += 1;
                 current_key = self.keys[index].as_ref().unwrap();
             }
-            if key > current_key {
+            if key.partial_compare(current_key) == Some(Greater) {
                 index += 1;
             }
-            if index < self.size && key == current_key {
+            if index < self.size && key.equals(current_key) {
                 let element = self.elements[index].as_ref().unwrap().clone();
                 element.borrow_mut().counter += 1;
                 return (Some(element), index)
@@ -185,19 +187,19 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
         } else {
             index = self.size - 1;
             let mut current_key = self.keys[index].as_ref().unwrap();
-            while index > 0 && key < current_key  {
+            while index > 0 && key.partial_compare(current_key) == Some(Less)  {
                 index -= 1;
                 current_key = self.keys[index].as_ref().unwrap();
             }
-            if key > current_key {
+            if key.partial_compare(current_key) == Some(Greater) {
                 index += 1;
-            } else if key == current_key {
+            } else if key.equals(current_key) {
                 let element = self.elements[index].as_ref().unwrap().clone();
                 element.borrow_mut().counter += 1;
                 return (Some(element), index)
             }
 
-            if index < self.size && key == current_key {
+            if index < self.size && key.equals(current_key) {
                 let element = self.elements[index].as_ref().unwrap().clone();
                 element.borrow_mut().counter += 1;
                 return (Some(element), index)
@@ -217,7 +219,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
         let mut index = node_size - 1;
         let mut counter = node_size as isize - 1;
         let mut should_move = false;
-        while counter >= 0 && key < node.borrow().keys[counter as usize].as_ref().unwrap() {
+        while counter >= 0 && key.partial_compare(node.borrow().keys[counter as usize].as_ref().unwrap()) == Some(Less) {
             should_move = true;
             index = counter as usize;
             counter -= 1;
@@ -234,7 +236,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
         
         let new_element = Element::new(key, parent);
         node.borrow_mut().elements[index] = Some(new_element.clone());
-        node.borrow_mut().keys[index] = Some(key.clone());
+        node.borrow_mut().keys[index] = Some(*dyn_clone::clone_box(key));
 
         let mut next_ptr = None;
         let mut prev_ptr = None;
@@ -277,7 +279,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Display for Node<Key, ORDER> 
-where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let mut node: String = format!(
             "<==leaf:{}, size:{}, keys:", self.is_leaf, self.size

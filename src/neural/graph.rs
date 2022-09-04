@@ -1,11 +1,12 @@
 use std::{
     rc::Rc,
     cell::RefCell,
-    collections::HashMap
+    collections::HashMap,
+    cmp::Ordering::*
 };
 
 use bionet_common::{
-    sensor::{ SensorDynamic, SensorDataDynamicMarker, SensorDynamicBuilder },
+    sensor::{ SensorDynamic, SensorDataDynamic, SensorDynamicBuilder },
     neuron::{ Neuron, NeuronID },
     data::DataCategory
 };
@@ -15,8 +16,9 @@ use super::{
     node::Node
 };
 
+#[derive(Clone)]
 pub struct ASAGraph<Key, const ORDER: usize = 25>
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     pub name: Rc<str>,
     pub data_category: DataCategory,
     pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
@@ -27,7 +29,7 @@ where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> SensorDynamic for ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     type Data = Key;
 
     fn name(&self) -> &str { &*self.name }
@@ -121,7 +123,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> SensorDynamicBuilder<Key> for ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     fn new(name: &str, data_category: DataCategory)
     -> Rc<RefCell<dyn SensorDynamic<Data = Key>>> {
         ASAGraph::<Key, ORDER>::new_rc(name, data_category)
@@ -129,7 +131,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     pub fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");
@@ -172,14 +174,14 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
             {
                 let mut current_key = node.keys[index].as_ref().unwrap();
                 
-                while index < node.size && key > current_key {
+                while index < node.size && key.partial_compare(current_key) == Some(Greater) {
                     index += 1;
                     if index < node.size {
                         current_key = node.keys[index].as_ref().unwrap();
                     }
                 }
 
-                if index < node.size && key == current_key {
+                if index < node.size && key.equals(current_key) {
                     let element = node.elements[index].as_ref().unwrap().clone();
                     return Some(element)
                 } else if node.is_leaf {
@@ -200,17 +202,17 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
             {
                 let mut current_key = node.keys[index].as_ref().unwrap();
                 
-                while index > 0 && key < current_key {
+                while index > 0 && key.partial_compare(current_key) == Some(Less) {
                     index -= 1;
                     current_key = node.keys[index].as_ref().unwrap();
                 }
 
-                if key == current_key {
+                if key.equals(current_key) {
                     let element = node.elements[index].as_ref().unwrap().clone();
                     return Some(element)
                 } else if node.is_leaf {
                     return None
-                } else if key > current_key {
+                } else if key.partial_compare(current_key) == Some(Greater) {
                     index += 1;
                 }
             }
@@ -247,9 +249,9 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
                 let child_size = node.borrow().children[index].as_ref().unwrap().borrow().size;
                 if child_size == Node::<Key, ORDER>::MAX_KEYS {
                     Node::split_child(&node, index);
-                    if key > &node.borrow().elements[index].as_ref().unwrap().borrow().key {
+                    if key.partial_compare(&node.borrow().elements[index].as_ref().unwrap().borrow().key) == Some(Greater) {
                         index += 1 
-                    } else if key == node.borrow().keys[index].as_ref().unwrap() {
+                    } else if key.equals(node.borrow().keys[index].as_ref().unwrap()) {
                         return node.borrow().elements[index].as_ref().unwrap().clone()
                     }
                 }
@@ -306,15 +308,17 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
         Some((key_min, key_max))
     }
 
+    fn unbox<T>(value: Box<T>) -> T { Box::into_inner(value) }
+
     fn insert_first_element(
         &mut self, node: &Rc<RefCell<Node<Key, ORDER>>>,  key: &Key
     ) -> Rc<RefCell<Element<Key, ORDER>>> {
         let element_pointer = Element::<Key, ORDER>::new(key, &self.name);
         node.borrow_mut().elements[0] = Some(element_pointer.clone());
-        node.borrow_mut().keys[0] = Some(key.clone());
+        node.borrow_mut().keys[0] = Some(*dyn_clone::clone_box(key));
 
-        self.key_min = Some(key.clone());
-        self.key_max = Some(key.clone());
+        self.key_min = Some(*dyn_clone::clone_box(key));
+        self.key_max = Some(*dyn_clone::clone_box(key));
         self.element_min = Some(element_pointer.clone());
         self.element_max = Some(element_pointer.clone());
         node.borrow_mut().size = 1;
@@ -340,19 +344,19 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
         if key_min.is_none() != key_max.is_none() {
             panic!("inconsistent extremas: key_min.is_none() != key_max.is_none()")
         } else if self.key_min.is_none() || self.key_max.is_none() {
-            self.key_min = Some(key.clone());
-            self.key_max = Some(key.clone());
+            self.key_min = Some(*dyn_clone::clone_box(key));
+            self.key_max = Some(*dyn_clone::clone_box(key));
             self.element_min = Some(element.clone());
             self.element_max = Some(element.clone());
             should_update_weights = true;
         } else {
-            if key < key_min.as_ref().unwrap() {
-                self.key_min = Some(key.clone());
+            if key.partial_compare(key_min.as_ref().unwrap()) == Some(Less) {
+                self.key_min = Some(*dyn_clone::clone_box(key));
                 self.element_min = Some(element.clone());
                 should_update_weights = true;
             }
-            if key > key_max.as_ref().unwrap() {
-                self.key_max = Some(key.clone());
+            if key.partial_compare(key_max.as_ref().unwrap()) == Some(Greater) {
+                self.key_max = Some(*dyn_clone::clone_box(key));
                 self.element_max = Some(element.clone());
                 should_update_weights = true;
             }   
@@ -432,7 +436,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
 }
 
 impl<'a, Key, const ORDER: usize> IntoIterator for &'a ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     type IntoIter = ASAGraphIntoIterator<'a, Key, ORDER>;
 
@@ -448,13 +452,13 @@ where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
 }
 
 pub struct ASAGraphIntoIterator<'a, Key, const ORDER: usize = 25>
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     graph: &'a ASAGraph<Key, ORDER>,
     index: Option<Rc<RefCell<Element<Key, ORDER>>>>
 }
 
 impl<'a, Key, const ORDER: usize> Iterator for ASAGraphIntoIterator<'a, Key, ORDER> 
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     fn next(&mut self) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
         let next_option;

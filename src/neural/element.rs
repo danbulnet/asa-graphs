@@ -13,11 +13,12 @@ use bionet_common::{
         ConnectionID,
         defining_connection::DefiningConnection
     },
-    sensor::SensorDataDynamicMarker
+    sensor::SensorDataDynamic
 };
 
+#[derive(Clone)]
 pub struct Element<Key, const ORDER: usize>
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     pub key: Key,
     pub counter: usize,
     pub activation: f32,
@@ -29,7 +30,7 @@ where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
-where Key: SensorDataDynamicMarker, [(); ORDER + 1]:  {
+where Key: SensorDataDynamic, [(); ORDER + 1]:  {
     pub const INTERELEMENT_ACTIVATION_THRESHOLD: f32 = 0.8;
 
     pub fn new(key: &Key, parent: &Rc<str>)
@@ -37,7 +38,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]:  {
         let element_ptr = Rc::new(
             RefCell::new(
                 Element {
-                    key: key.clone(),
+                    key: *dyn_clone::clone_box(key),
                     counter: 1,
                     activation: 0.0f32,
                     parent: parent.clone(),
@@ -184,7 +185,7 @@ where Key: SensorDataDynamicMarker, [(); ORDER + 1]:  {
 }
 
 impl<Key, const ORDER: usize> Neuron for Element<Key, ORDER> 
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     fn id(&self) -> NeuronID {
         NeuronID {
             id: Rc::from(self.key.to_string()),
@@ -242,7 +243,7 @@ where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> NeuronConnect for Element<Key, ORDER> 
-where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     fn connect_to(
         &mut self, to: Rc<RefCell<dyn Neuron>>, kind: ConnectionKind
     ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>, String> {
@@ -301,7 +302,7 @@ where Key: SensorDataDynamicMarker + 'static, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Display for Element<Key, ORDER> 
-where Key: SensorDataDynamicMarker, [(); ORDER + 1]: {
+where Key: SensorDataDynamic, [(); ORDER + 1]: {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "[{}:{}]", &self.key, &self.counter)
     }
