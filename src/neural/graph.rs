@@ -32,7 +32,7 @@ impl<Key, const ORDER: usize> SensorDynamic for ASAGraph<Key, ORDER>
 where Key: SensorDataDynamic, [(); ORDER + 1]: {
     type Data = Key;
 
-    fn name(&self) -> &str { &*self.name }
+    fn id(&self) -> &str { &*self.name }
 
     fn data_category(&self) -> DataCategory { self.data_category }
 
@@ -689,7 +689,7 @@ pub mod tests {
         let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
         for i in (1..=9).rev() { graph.insert(&i); }
         
-        assert_eq!(graph.name(), "test");
+        assert_eq!(graph.id(), "test");
         assert_eq!(graph.data_category(), DataCategory::Numerical);
 
         let neurons = graph.activate(&5, 1.0f32, true, true);
@@ -776,6 +776,6 @@ pub mod tests {
             "test", DataCategory::Numerical
         );
 
-        assert_eq!(sensor.borrow().name(), "test");
+        assert_eq!(sensor.borrow().id(), "test");
     }
 }
