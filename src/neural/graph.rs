@@ -32,6 +32,10 @@ impl<Key, const ORDER: usize> SensorDynamic for ASAGraph<Key, ORDER>
 where Key: SensorDataDynamic, [(); ORDER + 1]: {
     type Data = Key;
 
+    fn cast_data<'a, 'b: 'a>(&'a self, item: &'b Self::Data) -> &'b dyn SensorDataDynamic { 
+        item as &'b dyn SensorDataDynamic 
+    }
+
     fn name(&self) -> &str { &*self.name }
 
     fn data_category(&self) -> DataCategory { self.data_category }
