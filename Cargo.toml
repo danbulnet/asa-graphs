@@ -18,6 +18,7 @@ bionet-common = { git = "https://github.com/danbulnet/bionet-common.git", versio
 dyn-clone = "1.0.9"
 env_logger = "0.9.0"
 log = "0.4.17"
+polars-core = { version = "0.23.2", features = ["temporal"] }
 rand = "0.8.5"
 
 [dev-dependencies]

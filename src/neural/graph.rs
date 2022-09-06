@@ -5,10 +5,12 @@ use std::{
     cmp::Ordering::*
 };
 
+use polars_core::datatypes::DataType;
+
 use bionet_common::{
     sensor::{ SensorDynamic, SensorDataDynamic, SensorDynamicBuilder },
     neuron::{ Neuron, NeuronID },
-    data::DataCategory
+    data::{ DataCategory, DataVec }
 };
 
 use super::{
@@ -108,7 +110,7 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
         let mut element = match &self.element_min {
             Some(e) => e.clone(),
             None => { log::warn!("no element_min in asa-graph"); return }
-        };
+            };
 
         loop {
             element.borrow_mut().deactivate(false, false);
@@ -152,6 +154,20 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
             panic!("Graph order must be >= 3");
         }
         Rc::new(RefCell::new(ASAGraph::new(name, data_category)))
+    }
+
+    pub fn new_from_vec(
+        name: &str, data_category: DataCategory, data: &[Key]
+    ) -> Self {
+        let mut graph = Self::new(name, data_category);
+        for point in data { graph.insert(point); }
+        graph
+    }
+
+    pub fn new_rc_from_vec(
+        name: &str, data_category: DataCategory, data: &[Key]
+    ) ->Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::new_from_vec(name, data_category, data)))
     }
 
     pub fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
@@ -777,5 +793,14 @@ pub mod tests {
         );
 
         assert_eq!(sensor.borrow().id(), "test");
+    }
+
+    #[test]
+    fn new_from_vec() {
+        let vec = vec!["kot".to_string(), "pies".to_string()];
+        let graph = ASAGraph::<_, 25>::new_rc_from_vec("test", DataCategory::Categorical, &vec[..]);
+        assert!(graph.borrow().search(&"kot".to_string()).is_some());
+        let graph = ASAGraph::<_, 3>::new_from_vec("test", DataCategory::Categorical, &vec[..]);
+        assert!(graph.search(&"pies".to_string()).is_some());
     }
 }
