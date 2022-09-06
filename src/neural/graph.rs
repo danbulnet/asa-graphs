@@ -5,12 +5,10 @@ use std::{
     cmp::Ordering::*
 };
 
-use polars_core::datatypes::DataType;
-
 use bionet_common::{
     sensor::{ SensorDynamic, SensorDataDynamic, SensorDynamicBuilder },
     neuron::{ Neuron, NeuronID },
-    data::{ DataCategory, DataVec }
+    data::DataCategory
 };
 
 use super::{
