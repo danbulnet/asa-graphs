@@ -36,14 +36,14 @@ where Key: SensorData, [(); ORDER + 1]: {
 
     fn data_category(&self) -> DataCategory { self.data_category() }
 
-    fn insert(&mut self, key: &Key) -> Rc<RefCell<dyn Neuron>> {
-        self.insert(key.any().downcast_ref::<Key>().unwrap())
+    fn insert(&mut self, item: &Key) -> Rc<RefCell<dyn Neuron>> {
+        self.insert(item.any().downcast_ref::<Key>().unwrap())
     }
 
-    fn search(&self, key: &Key) -> Option<Rc<RefCell<dyn Neuron>>> { 
+    fn search(&self, item: &Key) -> Option<Rc<RefCell<dyn Neuron>>> { 
         Some(
             self.search(
-                key.any().downcast_ref::<Key>().unwrap()
+                item.any().downcast_ref::<Key>().unwrap()
             ).unwrap() as Rc<RefCell<dyn Neuron>>
         )
     }
