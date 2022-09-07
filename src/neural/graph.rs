@@ -107,9 +107,9 @@ where Key: SensorData, [(); ORDER + 1]: {
         Rc::new(RefCell::new(Self::new_from_vec(name, data_category, data)))
     }
     
-    fn id(&self) -> &str { &*self.name }
+    pub fn id(&self) -> &str { &*self.name }
 
-    fn data_category(&self) -> DataCategory { self.data_category }
+    pub fn data_category(&self) -> DataCategory { self.data_category }
 
     pub fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
         let node = &self.root;
@@ -391,7 +391,7 @@ where Key: SensorData, [(); ORDER + 1]: {
         }
     }
 
-    fn activate(
+    pub fn activate(
         &mut self, key: &Key, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<HashMap<NeuronID, Rc<RefCell<dyn Neuron>>>, String> {
         let element = match self.search(key) {
@@ -429,7 +429,7 @@ where Key: SensorData, [(); ORDER + 1]: {
         Ok(element.clone().borrow_mut().activate(signal, propagate_horizontal, propagate_vertical))
     }
 
-    fn deactivate(
+    pub fn deactivate(
         &mut self, key: &Key, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<(), String> {
         let element = match self.search(key) {
@@ -445,7 +445,7 @@ where Key: SensorData, [(); ORDER + 1]: {
         Ok(())
     }
 
-    fn deactivate_sensor(&mut self) {
+    pub fn deactivate_sensor(&mut self) {
         let mut element = match &self.element_min {
             Some(e) => e.clone(),
             None => { log::warn!("no element_min in asa-graph"); return }
