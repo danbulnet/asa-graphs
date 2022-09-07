@@ -28,10 +28,8 @@ where Key: SensorData, [(); ORDER + 1]: {
     pub key_max: Option<Key>
 }
 
-impl<Key, const ORDER: usize> Sensor for ASAGraph<Key, ORDER> 
+impl<Key, const ORDER: usize> Sensor<Key> for ASAGraph<Key, ORDER> 
 where Key: SensorData, [(); ORDER + 1]: {
-    type Data = Key;
-
     fn id(&self) -> &str { self.id() }
 
     fn data_category(&self) -> DataCategory { self.data_category() }
@@ -66,7 +64,7 @@ where Key: SensorData, [(); ORDER + 1]: {
 impl<Key, const ORDER: usize> SensorBuilder<Key> for ASAGraph<Key, ORDER> 
 where Key: SensorData, [(); ORDER + 1]: {
     fn new(name: &str, data_category: DataCategory)
-    -> Rc<RefCell<dyn Sensor<Data = Key>>> {
+    -> Rc<RefCell<dyn Sensor<Key>>> {
         ASAGraph::<Key, ORDER>::new_rc(name, data_category)
     }
 }
