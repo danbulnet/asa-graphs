@@ -5,8 +5,8 @@ use std::{
     cmp::Ordering::*
 };
 
-use bionet_common::{
-    sensor::{ SensorDynamic, SensorDataDynamic, SensorDynamicBuilder },
+use bionet_common::{ 
+    sensor::{ Sensor, SensorData, SensorBuilder },
     neuron::{ Neuron, NeuronID },
     data::DataCategory
 };
@@ -18,7 +18,7 @@ use super::{
 
 #[derive(Clone)]
 pub struct ASAGraph<Key, const ORDER: usize = 25>
-where Key: SensorDataDynamic, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]: {
     pub name: Rc<str>,
     pub data_category: DataCategory,
     pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
@@ -28,13 +28,13 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
     pub key_max: Option<Key>
 }
 
-impl<Key, const ORDER: usize> SensorDynamic for ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamic, [(); ORDER + 1]: {
+impl<Key, const ORDER: usize> Sensor for ASAGraph<Key, ORDER> 
+where Key: SensorData, [(); ORDER + 1]: {
     type Data = Key;
 
-    fn id(&self) -> &str { &*self.name }
+    fn id(&self) -> &str { self.id() }
 
-    fn data_category(&self) -> DataCategory { self.data_category }
+    fn data_category(&self) -> DataCategory { self.data_category() }
 
     fn insert(&mut self, key: &Key) -> Rc<RefCell<dyn Neuron>> {
         self.insert(key.any().downcast_ref::<Key>().unwrap())
@@ -51,87 +51,28 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
     fn activate(
         &mut self, item: &Key, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<HashMap<NeuronID, Rc<RefCell<dyn Neuron>>>, String> {
-        let item = item.any().downcast_ref::<Key>().unwrap();
-        let element = match self.search(item) {
-            Some(e) => e,
-            None => { 
-                match self.data_category {
-                    DataCategory::Categorical => {
-                        log::error!("activating missing categorical sensory neuron {}", item);
-                        return Err(
-                            format!("activating missing categorical sensory neuron {}", item)
-                        )
-                    },
-                    DataCategory::Numerical | DataCategory::Ordinal => {
-                        if propagate_horizontal {
-                            log::warn!(
-                                "activating missing non-categorical sensory neuron {}, inserting",
-                                item
-                            );
-                            self.insert(&item)
-                        } else {
-                            log::error!(
-                                "activating missing non-categorical sensory neuron {} with {}",
-                                item, "propagate_horizontal=false"
-                            );
-                            return Err(format!(
-                                "activating missing non-categorical sensory neuron {} with {}",
-                                item, "propagate_horizontal=false"
-                            ))
-                        }
-                    }
-                }
-            }
-        };
-
-        Ok(element.clone().borrow_mut().activate(signal, propagate_horizontal, propagate_vertical))
+        self.activate(item, signal, propagate_horizontal, propagate_vertical)
     }
 
     fn deactivate(
         &mut self, item: &Key, propagate_horizontal: bool, propagate_vertical: bool
     ) -> Result<(), String> {
-        let item = item.any().downcast_ref::<Key>().unwrap();
-        let element = match self.search(item) {
-            Some(e) => e,
-            None => {
-                log::error!("deactivating non-existing sensory neuron {}", item);
-                return Err(format!("deactivating non-existing sensory neuron {}", item))
-            }
-        };
-
-        element.borrow_mut().deactivate(propagate_horizontal, propagate_vertical);
-
-        Ok(())
+        self.deactivate(item, propagate_horizontal, propagate_vertical)
     }
 
-    fn deactivate_sensor(&mut self) {
-        let mut element = match &self.element_min {
-            Some(e) => e.clone(),
-            None => { log::warn!("no element_min in asa-graph"); return }
-            };
-
-        loop {
-            element.borrow_mut().deactivate(false, false);
-
-            let new_element= match &element.borrow().next {
-                Some(e) => e.0.upgrade().unwrap().clone(),
-                None => break
-            };
-            element = new_element;
-        }
-    }
+    fn deactivate_sensor(&mut self) { self.deactivate_sensor() }
 }
 
-impl<Key, const ORDER: usize> SensorDynamicBuilder<Key> for ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamic, [(); ORDER + 1]: {
+impl<Key, const ORDER: usize> SensorBuilder<Key> for ASAGraph<Key, ORDER> 
+where Key: SensorData, [(); ORDER + 1]: {
     fn new(name: &str, data_category: DataCategory)
-    -> Rc<RefCell<dyn SensorDynamic<Data = Key>>> {
+    -> Rc<RefCell<dyn Sensor<Data = Key>>> {
         ASAGraph::<Key, ORDER>::new_rc(name, data_category)
     }
 }
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamic, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]: {
     pub fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");
@@ -167,6 +108,10 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
     ) ->Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self::new_from_vec(name, data_category, data)))
     }
+    
+    fn id(&self) -> &str { &*self.name }
+
+    fn data_category(&self) -> DataCategory { self.data_category }
 
     pub fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
         let node = &self.root;
@@ -447,10 +392,81 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
             element = new_element;
         }
     }
+
+    fn activate(
+        &mut self, key: &Key, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
+    ) -> Result<HashMap<NeuronID, Rc<RefCell<dyn Neuron>>>, String> {
+        let element = match self.search(key) {
+            Some(e) => e,
+            None => { 
+                match self.data_category {
+                    DataCategory::Categorical => {
+                        log::error!("activating missing categorical sensory neuron {}", key);
+                        return Err(
+                            format!("activating missing categorical sensory neuron {}", key)
+                        )
+                    },
+                    DataCategory::Numerical | DataCategory::Ordinal => {
+                        if propagate_horizontal {
+                            log::warn!(
+                                "activating missing non-categorical sensory neuron {}, inserting",
+                                key
+                            );
+                            self.insert(&key)
+                        } else {
+                            log::error!(
+                                "activating missing non-categorical sensory neuron {} with {}",
+                                key, "propagate_horizontal=false"
+                            );
+                            return Err(format!(
+                                "activating missing non-categorical sensory neuron {} with {}",
+                                key, "propagate_horizontal=false"
+                            ))
+                        }
+                    }
+                }
+            }
+        };
+
+        Ok(element.clone().borrow_mut().activate(signal, propagate_horizontal, propagate_vertical))
+    }
+
+    fn deactivate(
+        &mut self, key: &Key, propagate_horizontal: bool, propagate_vertical: bool
+    ) -> Result<(), String> {
+        let element = match self.search(key) {
+            Some(e) => e,
+            None => {
+                log::error!("deactivating non-existing sensory neuron {}", key);
+                return Err(format!("deactivating non-existing sensory neuron {}", key))
+            }
+        };
+
+        element.borrow_mut().deactivate(propagate_horizontal, propagate_vertical);
+
+        Ok(())
+    }
+
+    fn deactivate_sensor(&mut self) {
+        let mut element = match &self.element_min {
+            Some(e) => e.clone(),
+            None => { log::warn!("no element_min in asa-graph"); return }
+            };
+
+        loop {
+            element.borrow_mut().deactivate(false, false);
+
+            let new_element= match &element.borrow().next {
+                Some(e) => e.0.upgrade().unwrap().clone(),
+                None => break
+            };
+            element = new_element;
+        }
+    }
 }
 
 impl<'a, Key, const ORDER: usize> IntoIterator for &'a ASAGraph<Key, ORDER> 
-where Key: SensorDataDynamic, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     type IntoIter = ASAGraphIntoIterator<'a, Key, ORDER>;
 
@@ -466,13 +482,13 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
 }
 
 pub struct ASAGraphIntoIterator<'a, Key, const ORDER: usize = 25>
-where Key: SensorDataDynamic, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]: {
     graph: &'a ASAGraph<Key, ORDER>,
     index: Option<Rc<RefCell<Element<Key, ORDER>>>>
 }
 
 impl<'a, Key, const ORDER: usize> Iterator for ASAGraphIntoIterator<'a, Key, ORDER> 
-where Key: SensorDataDynamic, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]: {
     type Item = Rc<RefCell<Element<Key, ORDER>>>;
     fn next(&mut self) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
         let next_option;
@@ -499,13 +515,12 @@ where Key: SensorDataDynamic, [(); ORDER + 1]: {
 
 #[cfg(test)]
 pub mod tests {
-    use bionet_common::sensor::SensorDynamicBuilder;
+    use bionet_common::sensor::SensorBuilder;
     use rand::Rng;
     use std::{ time::Instant };
 
     use bionet_common::{
         data::DataCategory,
-        sensor::SensorDynamic,
         neuron::Neuron
     };
 
@@ -786,7 +801,7 @@ pub mod tests {
 
     #[test]
     fn test_sensor_dynamic_builder() {
-        let sensor = <crate::neural::graph::ASAGraph::<i32, 25> as SensorDynamicBuilder::<i32>>::new(
+        let sensor = <crate::neural::graph::ASAGraph::<i32, 25> as SensorBuilder::<i32>>::new(
             "test", DataCategory::Numerical
         );
 
