@@ -8,18 +8,24 @@ use std::{
 use bionet_common::{
     data::{ DataCategory, DataType, DataDeductor },
     neuron::{ Neuron, NeuronID },
-    sensor::{ Sensor, SensorData, SensorBuilder}
+    sensor::{ Sensor, SensorData }
 };
 
 use super::graph::ASAGraph;
 
 impl<Key, const ORDER: usize> Sensor<Key> for ASAGraph<Key, ORDER> 
 where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
+    type Type = ASAGraph<Key, ORDER>;
+
     fn id(&self) -> &str { self.id() }
 
     fn data_type(&self) -> DataType { self.data_type() }
 
     fn data_category(&self) -> DataCategory { self.data_category() }
+
+    fn downcast(&self) -> &Self::Type { &self }
+    
+    fn downcast_mut(&mut self) -> &mut Self::Type { self }
 
     fn insert(&mut self, item: &Key) -> Rc<RefCell<dyn Neuron>> {
         self.insert(item.any().downcast_ref::<Key>().unwrap())
@@ -48,19 +54,12 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
     fn deactivate_sensor(&mut self) { self.deactivate_sensor() }
 }
 
-impl<Key, const ORDER: usize> SensorBuilder<Key> for ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
-    fn new(name: &str) -> Rc<RefCell<dyn Sensor<Key>>> {
-        ASAGraph::<Key, ORDER>::new_rc(name)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use bionet_common::{
         data::DataCategory,
         neuron::Neuron,
-        sensor::SensorBuilder
+        sensor::Sensor
     };
 
     use super::super::element::Element;
@@ -156,10 +155,9 @@ mod tests {
 
     #[test]
     fn test_sensor_dynamic_builder() {
-        let sensor = <crate::neural::graph::ASAGraph::<i32, 25> as SensorBuilder::<i32>>::new(
-            "test"
-        );
+        let sensor = ASAGraph::<i32, 25>::new("test");
+        let sensor_as_sensor = &sensor as &dyn Sensor<i32, Type = ASAGraph<i32, 25>>;
 
-        assert_eq!(sensor.borrow().id(), "test");
+        assert_eq!(sensor_as_sensor.id(), "test");
     }
 }
