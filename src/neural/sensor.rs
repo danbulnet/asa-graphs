@@ -8,7 +8,7 @@ use std::{
 use bionet_common::{
     data::{ DataCategory, DataType, DataDeductor },
     neuron::{ Neuron, NeuronID },
-    sensor::{ Sensor, SensorData, SensorDowncast }
+    sensor::{ Sensor, SensorData }
 };
 
 use super::graph::ASAGraph;
@@ -48,29 +48,11 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
     fn deactivate_sensor(&mut self) { self.deactivate_sensor() }
 }
 
-impl<Key, const ORDER: usize> SensorDowncast<Key> for ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
-    type Type = ASAGraph<Key, ORDER>;
-
-    fn downcast(sensor: &dyn Sensor<Key>) ->&Self::Type { 
-        // let x = &sensor as &dyn Any;
-        // x.downcast_ref()
-        unsafe { &*(sensor as *const dyn Sensor<Key> as *const ASAGraph<Key, ORDER>) }
-    }
-    
-    fn downcast_mut(sensor: &mut dyn Sensor<Key>) -> &mut Self::Type { 
-        // let x = &mut sensor as &mut dyn Any;
-        // x.downcast_mut()
-        unsafe { &mut *(sensor as *mut dyn Sensor<Key> as *mut ASAGraph<Key, ORDER>) }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use bionet_common::{
         data::DataCategory,
-        neuron::Neuron,
-        sensor::{ Sensor, SensorDowncast }
+        neuron::Neuron
     };
 
     use super::super::element::Element;
@@ -162,16 +144,5 @@ mod tests {
             let n = i + 1;
             if n == 8 { assert_eq!(activation, 1.0f32) } else { assert_eq!(activation, 0.0f32) }
         }
-    }
-
-    #[test]
-    fn test_sensor_downcast() {
-        let sensor = ASAGraph::<i32, 25>::new("test");
-        let sensor_as_sensor = &sensor as &dyn Sensor<i32>;
-
-        assert_eq!(sensor_as_sensor.id(), "test");
-
-        let sensor_downcasted = <ASAGraph<i32, 25> as SensorDowncast<i32>>::downcast(sensor_as_sensor);
-        assert!(sensor_downcasted.key_min.is_none());
     }
 }
