@@ -6,7 +6,7 @@ use std::{
 };
 
 use bionet_common::{
-    data::{ DataCategory, DataType, DataTypeDeductor },
+    data::{ DataCategory, DataType, DataDeductor },
     neuron::{ Neuron, NeuronID },
     sensor::{ Sensor, SensorData, SensorBuilder}
 };
@@ -14,7 +14,7 @@ use bionet_common::{
 use super::graph::ASAGraph;
 
 impl<Key, const ORDER: usize> Sensor<Key> for ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataTypeDeductor {
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
     fn id(&self) -> &str { self.id() }
 
     fn data_type(&self) -> DataType { self.data_type() }
@@ -49,10 +49,9 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataTypeDeductor {
 }
 
 impl<Key, const ORDER: usize> SensorBuilder<Key> for ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataTypeDeductor {
-    fn new(name: &str, data_category: DataCategory)
-    -> Rc<RefCell<dyn Sensor<Key>>> {
-        ASAGraph::<Key, ORDER>::new_rc(name, data_category)
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
+    fn new(name: &str) -> Rc<RefCell<dyn Sensor<Key>>> {
+        ASAGraph::<Key, ORDER>::new_rc(name)
     }
 }
 
@@ -71,7 +70,7 @@ mod tests {
     fn sensor() {
         assert_eq!(Element::<i32, 3>::INTERELEMENT_ACTIVATION_THRESHOLD, 0.8f32);
 
-        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
+        let mut graph = ASAGraph::<i32, 3>::new("test");
         for i in (1..=9).rev() { graph.insert(&i); }
         
         assert_eq!(graph.id(), "test");
@@ -158,7 +157,7 @@ mod tests {
     #[test]
     fn test_sensor_dynamic_builder() {
         let sensor = <crate::neural::graph::ASAGraph::<i32, 25> as SensorBuilder::<i32>>::new(
-            "test", DataCategory::Numerical
+            "test"
         );
 
         assert_eq!(sensor.borrow().id(), "test");

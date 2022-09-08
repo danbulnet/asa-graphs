@@ -9,7 +9,7 @@ use std::{
 use bionet_common::{ 
     sensor::SensorData,
     neuron::{ Neuron, NeuronID },
-    data::{ DataCategory, DataType, DataTypeDeductor },
+    data::{ DataCategory, DataType, DataDeductor },
 };
 
 use super::{
@@ -21,7 +21,6 @@ use super::{
 pub struct ASAGraph<Key, const ORDER: usize = 25>
 where Key: SensorData, [(); ORDER + 1]: {
     pub name: Rc<str>,
-    pub data_category: DataCategory,
     pub(crate) root: Rc<RefCell<Node<Key, ORDER>>>,
     pub element_min: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub element_max: Option<Rc<RefCell<Element<Key, ORDER>>>>,
@@ -31,14 +30,13 @@ where Key: SensorData, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataTypeDeductor {
-    pub fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> {
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
+    pub fn new(name: &str) -> ASAGraph<Key, ORDER> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");
         }
         ASAGraph {
             name: Rc::from(name),
-            data_category,
             root: Rc::new(RefCell::new(Node::<Key, ORDER>::new(true, None))),
             element_min: None,
             element_max: None,
@@ -48,32 +46,32 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataTypeDeductor {
         }
     }
 
-    pub fn new_rc(name: &str, data_category: DataCategory) -> Rc<RefCell<ASAGraph<Key, ORDER>>> {
+    pub fn new_rc(name: &str) -> Rc<RefCell<ASAGraph<Key, ORDER>>> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");
         }
-        Rc::new(RefCell::new(ASAGraph::new(name, data_category)))
+        Rc::new(RefCell::new(ASAGraph::new(name)))
     }
 
     pub fn new_from_vec(
-        name: &str, data_category: DataCategory, data: &[Key]
+        name: &str, data: &[Key]
     ) -> Self {
-        let mut graph = Self::new(name, data_category);
+        let mut graph = Self::new(name);
         for point in data { graph.insert(point); }
         graph
     }
 
     pub fn new_rc_from_vec(
-        name: &str, data_category: DataCategory, data: &[Key]
+        name: &str, data: &[Key]
     ) ->Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::new_from_vec(name, data_category, data)))
+        Rc::new(RefCell::new(Self::new_from_vec(name, data)))
     }
     
     pub fn id(&self) -> &str { &*self.name }
 
-    pub fn data_type(&self) -> DataType { (&self.data_type as &dyn DataTypeDeductor).data_type() }
+    pub fn data_type(&self) -> DataType { self.data_type.data_type() }
 
-    pub fn data_category(&self) -> DataCategory { self.data_category }
+    pub fn data_category(&self) -> DataCategory { self.data_type.data_category() }
 
     pub fn search(&self, key: &Key) -> Option<Rc<RefCell<Element<Key, ORDER>>>> {
         let node = &self.root;
@@ -361,7 +359,7 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataTypeDeductor {
         let element = match self.search(key) {
             Some(e) => e,
             None => { 
-                match self.data_category {
+                match self.data_category() {
                     DataCategory::Categorical => {
                         log::error!("activating missing categorical sensory neuron {}", key);
                         return Err(
@@ -480,15 +478,11 @@ pub mod tests {
     use rand::Rng;
     use std::{ time::Instant };
 
-    use bionet_common::{
-        data::DataCategory
-    };
-
     use super::ASAGraph;
 
     #[test]
     fn create_empty_graph() {
-        ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
+        ASAGraph::<i32, 3>::new("test");
     }
 
     #[test]
@@ -497,7 +491,7 @@ pub mod tests {
 
         let start = Instant::now();
 
-        let mut graph = Box::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical));
+        let mut graph = Box::new(ASAGraph::<i32, 3>::new("test"));
 
         let n = 1_000;
         for _ in 0..n {
@@ -514,7 +508,7 @@ pub mod tests {
     fn print_graph() {
         let mut rng = rand::thread_rng();
 
-        let mut graph = ASAGraph::<i32, 5>::new("test", DataCategory::Numerical);
+        let mut graph = ASAGraph::<i32, 5>::new("test");
 
         for _ in 0..50 {
             let number: i32 = rng.gen_range(1..=20);
@@ -526,7 +520,7 @@ pub mod tests {
 
     #[test]
     fn insert_3_degree() {
-        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
+        let mut graph = ASAGraph::<i32, 3>::new("test");
 
         for i in 1..=250 {
             graph.insert(&i);
@@ -551,7 +545,7 @@ pub mod tests {
 
     #[test]
     fn insert_25_degree() {
-        let mut graph = ASAGraph::<i32, 25>::new("test", DataCategory::Numerical);
+        let mut graph = ASAGraph::<i32, 25>::new("test");
 
         for i in 1..=250 {
             graph.insert(&i);
@@ -576,7 +570,7 @@ pub mod tests {
 
     #[test]
     fn search() {
-        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
+        let mut graph = ASAGraph::<i32, 3>::new("test");
 
         let n = 100;
         for i in 0..n {
@@ -595,7 +589,7 @@ pub mod tests {
 
     #[test]
     fn test_connections() {
-        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
+        let mut graph = ASAGraph::<i32, 3>::new("test");
     
         let n = 50;
         for i in 1..=n {
@@ -628,7 +622,7 @@ pub mod tests {
 
     #[test]
     fn test_connections_rev() {
-        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
+        let mut graph = ASAGraph::<i32, 3>::new("test");
     
         let n = 50;
         for i in (1..=n).rev() {
@@ -661,7 +655,7 @@ pub mod tests {
 
     #[test]
     fn iterator_test() {
-        let mut graph = ASAGraph::<i32, 3>::new("test", DataCategory::Numerical);
+        let mut graph = ASAGraph::<i32, 3>::new("test");
         let n = 50;
         for i in (0..=n).rev() { graph.insert(&i); }
         for (i, element) in graph.into_iter().enumerate() {
@@ -673,9 +667,9 @@ pub mod tests {
     #[test]
     fn new_from_vec() {
         let vec = vec!["kot".to_string(), "pies".to_string()];
-        let graph = ASAGraph::<_, 25>::new_rc_from_vec("test", DataCategory::Categorical, &vec[..]);
+        let graph = ASAGraph::<_, 25>::new_rc_from_vec("test", &vec[..]);
         assert!(graph.borrow().search(&"kot".to_string()).is_some());
-        let graph = ASAGraph::<_, 3>::new_from_vec("test", DataCategory::Categorical, &vec[..]);
+        let graph = ASAGraph::<_, 3>::new_from_vec("test", &vec[..]);
         assert!(graph.search(&"pies".to_string()).is_some());
     }
 }

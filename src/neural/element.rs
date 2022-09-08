@@ -317,8 +317,7 @@ mod tests {
 
     use bionet_common::{
         neuron::{ Neuron, NeuronConnect },
-        connection::ConnectionKind,
-        data::DataCategory
+        connection::ConnectionKind
     };
 
     use super::super::{
@@ -329,7 +328,7 @@ mod tests {
     #[test]
     fn set_connections() {
         let graph = Rc::new(
-            RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical))
+            RefCell::new(ASAGraph::<i32, 3>::new("test"))
         );
         let graph_name = &graph.borrow().name;
 
@@ -387,7 +386,7 @@ mod tests {
 
     #[test]
     fn parent_name() {
-        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical)));
+        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
         let graph_name_ptr = &graph.borrow().name;
 
         let element_1_ptr: Rc<RefCell<Element<i32, 3>>> = Element::new(&1, graph_name_ptr);
@@ -397,7 +396,7 @@ mod tests {
 
     #[test]
     fn as_neuron() {
-        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical)));
+        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
         let graph_name = &graph.borrow().name;
 
         let element_1_ptr: Rc<RefCell<Element<i32, 3>>> = Element::new(&1, graph_name);
@@ -466,7 +465,7 @@ mod tests {
         assert_eq!(Element::<i32, 3>::INTERELEMENT_ACTIVATION_THRESHOLD, 0.8f32);
 
         let graph = Rc::new(
-            RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical))
+            RefCell::new(ASAGraph::<i32, 3>::new("test"))
         );
         for i in 1..=9 { graph.borrow_mut().insert(&i); }
         {
@@ -547,7 +546,7 @@ mod tests {
     #[test]
     fn simple_activate() {
         let graph = Rc::new(
-            RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical))
+            RefCell::new(ASAGraph::<i32, 3>::new("test"))
         );
         for i in 1..=9 { graph.borrow_mut().insert(&i); }
 

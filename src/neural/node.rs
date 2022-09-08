@@ -319,8 +319,6 @@ mod tests {
         cell::RefCell
     };
 
-    use bionet_common::data::DataCategory;
-
     use super::super::{
         node::Node,
         element::Element,
@@ -336,7 +334,7 @@ mod tests {
 
     #[test]
     fn insert_into_leaf() {
-        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical)));
+        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
         let root: &Rc<RefCell<Node<i32, 3>>> = &graph.borrow().root;
         let graph_name = &graph.borrow().name;
 
@@ -365,7 +363,7 @@ mod tests {
 
     #[test]
     fn split_node() {
-        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test", DataCategory::Numerical)));
+        let graph = Rc::new(RefCell::new(ASAGraph::<i32, 3>::new("test")));
         let root: &Rc<RefCell<Node<i32, 3>>> = &graph.borrow().root;
         let graph_name = &graph.borrow().name;
 

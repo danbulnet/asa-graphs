@@ -3,8 +3,6 @@ use rand::{
     rngs::StdRng
 };
 
-use bionet_common::data::DataCategory;
-
 use asa_graphs::{
     simple::graph::ASAGraph as ASAGraphSimple,
     neural::graph::ASAGraph as ASAGraphNeural
@@ -28,7 +26,7 @@ fn main() {
 
     let mut rng = StdRng::seed_from_u64(35);
 
-    let mut graph_neural = ASAGraphNeural::<i32, 3>::new("test", DataCategory::Numerical);
+    let mut graph_neural = ASAGraphNeural::<i32, 3>::new("test");
 
     for _i in 0..10_000 {
         let number = rng.gen_range(0..58);
@@ -45,7 +43,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use bionet_common::neuron::Neuron;
 fn fuzzy_activate() {
-    let graph = Rc::new(RefCell::new(ASAGraphNeural::<i32, 3>::new("test", DataCategory::Numerical)));
+    let graph = Rc::new(RefCell::new(ASAGraphNeural::<i32, 3>::new("test")));
     for i in 1..=9 { graph.borrow_mut().insert(&i); }
 
     let mid_element = graph.borrow().search(&5).unwrap();
