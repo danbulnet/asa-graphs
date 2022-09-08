@@ -2,13 +2,14 @@ use std::{
     rc::Rc,
     cell::RefCell,
     collections::HashMap,
-    cmp::Ordering::*
+    cmp::Ordering::*,
+    marker::PhantomData
 };
 
 use bionet_common::{ 
     sensor::SensorData,
     neuron::{ Neuron, NeuronID },
-    data::DataCategory
+    data::{ DataCategory, DataType, DataTypeDeductor },
 };
 
 use super::{
@@ -25,11 +26,12 @@ where Key: SensorData, [(); ORDER + 1]: {
     pub element_min: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub element_max: Option<Rc<RefCell<Element<Key, ORDER>>>>,
     pub key_min: Option<Key>,
-    pub key_max: Option<Key>
+    pub key_max: Option<Key>,
+    pub(crate) data_type: PhantomData<Key>
 }
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataTypeDeductor {
     pub fn new(name: &str, data_category: DataCategory) -> ASAGraph<Key, ORDER> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");
@@ -41,7 +43,8 @@ where Key: SensorData, [(); ORDER + 1]: {
             element_min: None,
             element_max: None,
             key_min: None,
-            key_max: None
+            key_max: None,
+            data_type: PhantomData
         }
     }
 
@@ -67,6 +70,8 @@ where Key: SensorData, [(); ORDER + 1]: {
     }
     
     pub fn id(&self) -> &str { &*self.name }
+
+    pub fn data_type(&self) -> DataType { (&self.data_type as &dyn DataTypeDeductor).data_type() }
 
     pub fn data_category(&self) -> DataCategory { self.data_category }
 

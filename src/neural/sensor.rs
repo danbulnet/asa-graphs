@@ -1,21 +1,23 @@
 use std::{
     rc::Rc,
     cell::RefCell,
-    collections::HashMap
+    collections::HashMap,
+    marker::PhantomData
 };
 
 use bionet_common::{
-    data::DataCategory,
+    data::{ DataCategory, DataType, DataTypeDeductor },
     neuron::{ Neuron, NeuronID },
     sensor::{ Sensor, SensorData, SensorBuilder}
 };
 
 use super::graph::ASAGraph;
 
-
 impl<Key, const ORDER: usize> Sensor<Key> for ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataTypeDeductor {
     fn id(&self) -> &str { self.id() }
+
+    fn data_type(&self) -> DataType { self.data_type() }
 
     fn data_category(&self) -> DataCategory { self.data_category() }
 
@@ -47,7 +49,7 @@ where Key: SensorData, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> SensorBuilder<Key> for ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataTypeDeductor {
     fn new(name: &str, data_category: DataCategory)
     -> Rc<RefCell<dyn Sensor<Key>>> {
         ASAGraph::<Key, ORDER>::new_rc(name, data_category)
