@@ -67,7 +67,7 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
         Rc::new(RefCell::new(Self::new_from_vec(name, data)))
     }
     
-    pub fn id(&self) -> &str { &*self.name }
+    pub fn id(&self) -> Rc<str> { self.name.clone() }
 
     pub fn data_type(&self) -> DataType { self.data_type.data_type() }
 

@@ -15,7 +15,7 @@ use super::graph::ASAGraph;
 
 impl<Key, const ORDER: usize> Sensor<Key> for ASAGraph<Key, ORDER> 
 where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
-    fn id(&self) -> &str { self.id() }
+    fn id(&self) -> Rc<str> { self.id() }
 
     fn data_type(&self) -> DataType { self.data_type() }
 
@@ -50,6 +50,8 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use bionet_common::{
         data::DataCategory,
         neuron::Neuron
@@ -65,7 +67,7 @@ mod tests {
         let mut graph = ASAGraph::<i32, 3>::new("test");
         for i in (1..=9).rev() { graph.insert(&i); }
         
-        assert_eq!(graph.id(), "test");
+        assert_eq!(graph.id(), Rc::from("test"));
         assert_eq!(graph.data_category(), DataCategory::Numerical);
 
         let neurons = graph.activate(&5, 1.0f32, true, true);
