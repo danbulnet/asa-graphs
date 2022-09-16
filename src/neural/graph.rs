@@ -53,18 +53,25 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
         Rc::new(RefCell::new(ASAGraph::new(name)))
     }
 
-    pub fn new_from_vec(
-        name: &str, data: &[Key]
-    ) -> Self {
+    pub fn new_box(name: &str) -> Box<ASAGraph<Key, ORDER>> {
+        if ORDER < 3 {
+            panic!("Graph order must be >= 3");
+        }
+        Box::new(ASAGraph::new(name))
+    }
+
+    pub fn new_from_vec(name: &str, data: &[Key]) -> Self {
         let mut graph = Self::new(name);
         for point in data { graph.insert(point); }
         graph
     }
 
-    pub fn new_rc_from_vec(
-        name: &str, data: &[Key]
-    ) ->Rc<RefCell<Self>> {
+    pub fn new_rc_from_vec(name: &str, data: &[Key]) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self::new_from_vec(name, data)))
+    }
+
+    pub fn new_box_from_vec(name: &str, data: &[Key]) -> Box<Self> {
+        Box::new(Self::new_from_vec(name, data))
     }
     
     pub fn id(&self) -> Rc<str> { self.name.clone() }
