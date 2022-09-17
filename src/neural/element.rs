@@ -2,7 +2,8 @@ use std::{
     fmt::{ Display, Formatter, Result as FmtResult },
     rc::{ Rc, Weak },
     cell::RefCell,
-    collections::HashMap
+    collections::HashMap,
+    marker::PhantomData
 };
 
 use bionet_common::{
@@ -13,7 +14,8 @@ use bionet_common::{
         ConnectionID,
         defining_connection::DefiningConnection
     },
-    sensor::SensorData
+    sensor::SensorData,
+    data::{ DataDeductor, DataCategory }
 };
 
 #[derive(Clone)]
@@ -27,10 +29,11 @@ where Key: SensorData, [(); ORDER + 1]: {
     pub next: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
     pub prev: Option<(Weak<RefCell<Element<Key, ORDER>>>, f32)>,
     pub definitions: HashMap<ConnectionID, Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>>,
+    pub(crate) data_type: PhantomData<Key>
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:  {
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor  {
     pub const INTERELEMENT_ACTIVATION_THRESHOLD: f32 = 0.8;
 
     pub fn new(key: &Key, parent: &Rc<str>)
@@ -45,7 +48,8 @@ where Key: SensorData, [(); ORDER + 1]:  {
                     self_ptr: Weak::new(), 
                     next: None,
                     prev: None,
-                    definitions: HashMap::new()
+                    definitions: HashMap::new(),
+                    data_type: PhantomData
                 }
             )
         );
@@ -185,7 +189,7 @@ where Key: SensorData, [(); ORDER + 1]:  {
 }
 
 impl<Key, const ORDER: usize> Neuron for Element<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
     fn id(&self) -> NeuronID {
         NeuronID {
             id: Rc::from(self.key.to_string()),
@@ -208,7 +212,12 @@ where Key: SensorData, [(); ORDER + 1]: {
     fn activate(
         &mut self, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
     ) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
-        let mut neurons = if propagate_horizontal{
+        let data_category: DataCategory = self.data_type.data_category();
+        let is_fuzzy_ok = match data_category {
+            DataCategory::Numerical | DataCategory::Ordinal => true,
+            _ => false
+        };
+        let mut neurons = if propagate_horizontal && is_fuzzy_ok {
             self.fuzzy_activate(signal)
         } else {
             self.simple_activate(signal)
@@ -244,7 +253,7 @@ where Key: SensorData, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> NeuronConnect for Element<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
     fn connect_to(
         &mut self, to: Rc<RefCell<dyn Neuron>>, kind: ConnectionKind
     ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>, String> {

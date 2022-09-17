@@ -2,12 +2,14 @@ use std::{
     fmt::{ Display, Formatter, Result },
     rc::{ Rc, Weak },
     cell::{ RefCell, Ref, RefMut },
-    cmp::Ordering::*
+    cmp::Ordering::*,
+    marker::PhantomData
 };
 
 use bionet_common::{
     algorithms::SearchAlgorithm,
-    sensor::SensorData
+    sensor::SensorData,
+    data::DataDeductor
 };
 
 use super::element::Element;
@@ -24,7 +26,7 @@ where Key: SensorData, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Node<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]: {
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
     pub fn new(
         is_leaf: bool, parent: Option<Weak<RefCell<Node<Key, ORDER>>>>
     ) -> Node<Key, ORDER> {
