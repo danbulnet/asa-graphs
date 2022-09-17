@@ -198,6 +198,12 @@ where Key: SensorData, [(); ORDER + 1]: {
     fn is_sensor(&self) -> bool { true }
 
     fn counter(&self) -> usize { self.counter }
+    
+    fn explain(&self) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> { 
+        HashMap::from(
+            [(self.id(), self.self_ptr.upgrade().unwrap() as Rc<RefCell<dyn Neuron>>)]
+        ) 
+    }
 
     fn activate(
         &mut self, signal: f32, propagate_horizontal: bool, propagate_vertical: bool
@@ -221,12 +227,6 @@ where Key: SensorData, [(); ORDER + 1]: {
         }
 
         neurons
-    }
-
-    fn explain(&mut self) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> { 
-        HashMap::from(
-            [(self.id(), self.self_ptr.upgrade().unwrap() as Rc<RefCell<dyn Neuron>>)]
-        ) 
     }
 
     fn deactivate(&mut self, propagate_horizontal: bool, propagate_vertical: bool) {
