@@ -217,9 +217,10 @@ where Key: SensorData, [(); ORDER + 1]: {
         if propagate_vertical {
             for (_id, neuron) in &neurons.clone() {
                 if !neuron.borrow().is_sensor() {
+                    let output_signal = self.activation / self.defined_neurons().len() as f32;
                     neurons.extend(
                         neuron.borrow_mut().activate(
-                            self.activation, propagate_horizontal, propagate_vertical
+                            output_signal, propagate_horizontal, propagate_vertical
                         )
                     );
                 }
