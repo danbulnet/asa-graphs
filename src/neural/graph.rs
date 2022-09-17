@@ -3,7 +3,8 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     cmp::Ordering::*,
-    marker::PhantomData
+    marker::PhantomData,
+    fmt::{ Display, Formatter, Result as FmtResult }
 };
 
 use bionet_common::{ 
@@ -480,6 +481,43 @@ where Key: SensorData, [(); ORDER + 1]: {
     }
 }
 
+impl<Key, const ORDER: usize> Display for ASAGraph<Key, ORDER> 
+where Key: SensorData, [(); ORDER + 1]: {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        let mut height = 0;
+        let mut node = self.root.clone();
+        let mut queue: Vec<Vec<Rc<RefCell<Node<Key, ORDER>>>>> = vec![vec![]];
+        queue[0].push(node.clone());
+
+        loop {
+            queue.push(vec![]);
+            for i in 0..(queue[height].len()) {
+                node = queue[height][i].clone();
+                let node_size = node.borrow().size;
+                write!(f, "||")?;
+                for j in 0..(node_size) {
+                    let element = node.borrow().elements[j].as_ref().unwrap().clone();
+                    write!(f, "{}:{}|", &element.borrow().key, element.borrow().counter)?;
+                    if !node.borrow().is_leaf {
+                        queue[height + 1].push(node.borrow().children[j].as_ref().unwrap().clone());
+                    }
+                }
+                if !node.borrow().is_leaf {
+                    queue[height + 1].push(node.borrow().children[node_size].as_ref().unwrap().clone());
+                }
+                write!(f, "| ")?;
+            }
+            if queue.last().unwrap().len() > 0 {
+                height += 1;
+                writeln!(f, "")?;
+            } else {
+                writeln!(f, "")?;
+                return Ok(())
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use rand::Rng;
@@ -678,5 +716,13 @@ pub mod tests {
         assert!(graph.borrow().search(&"kot".to_string()).is_some());
         let graph = ASAGraph::<_, 3>::new_from_vec("test", &vec[..]);
         assert!(graph.search(&"pies".to_string()).is_some());
+    }
+
+    #[test]
+    fn display_graph() {
+        let mut graph = ASAGraph::<i32, 3>::new("test");
+        for i in 1..=25 { graph.insert(&i); }
+
+        println!("{graph}");
     }
 }
