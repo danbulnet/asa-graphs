@@ -89,13 +89,15 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor  {
         1.0f32 - (other.key.distance(&self.key) as f32).abs() / range
     }
 
-    pub fn fuzzy_activate(
-        &mut self, signal: f32
-    ) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
+    pub fn fuzzy_activate(&mut self, signal: f32) -> Vec<(Rc<RefCell<dyn Neuron>>, f32)> {
         self.activation += signal;
 
-        let mut neurons = self.defined_neurons();
-
+        let defined_neurons_len = self.defined_neurons().len();
+        let mut neurons: Vec<(Rc<RefCell<dyn Neuron>>, f32)> = self
+            .defined_neurons()
+            .values()
+            .map(|neuron| (neuron.clone(), self.activation() / defined_neurons_len as f32))
+            .collect();
 
         let mut element_activation = self.activation;
         if let Some(next) = &self.next {
@@ -103,7 +105,20 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor  {
             let mut weight = next.1;
             while element_activation > Self::INTERELEMENT_ACTIVATION_THRESHOLD {
                 element.borrow_mut().activate(element_activation * weight, false, false);
-                neurons.extend(element.borrow().defined_neurons());
+                let defined_neurons_len = element.borrow().defined_neurons().len();
+                neurons.append(
+                    &mut element.borrow()
+                        .defined_neurons()
+                        .values()
+                        .cloned()
+                        .into_iter().map(
+                            |neuron| (
+                                neuron.clone(), 
+                                element.borrow().activation() / defined_neurons_len as f32
+                            )
+                        )
+                        .collect()
+                );
 
                 let new_element = match &element.borrow().next {
                     Some(next) => {
@@ -123,7 +138,20 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor  {
             let mut weight = prev.1;
             while element_activation > Self::INTERELEMENT_ACTIVATION_THRESHOLD {
                 element.borrow_mut().activate(element_activation * weight, false, false);
-                neurons.extend(element.borrow().defined_neurons());
+                let defined_neurons_len = element.borrow().defined_neurons().len();
+                neurons.append(
+                    &mut element.borrow()
+                        .defined_neurons()
+                        .values()
+                        .cloned()
+                        .into_iter().map(
+                            |neuron| (
+                                neuron.clone(), 
+                                element.borrow().activation() / defined_neurons_len as f32
+                            )
+                        )
+                        .collect()
+                );
 
                 let new_element = match &element.borrow().prev {
                     Some(prev) => {
@@ -143,9 +171,14 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor  {
     
     pub(crate) fn simple_activate(
         &mut self, signal: f32
-    )-> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
+    )-> Vec<(Rc<RefCell<dyn Neuron>>, f32)> {
         self.activation += signal;
+        let defined_neurons_len = self.defined_neurons().len();
         self.defined_neurons()
+            .values()
+            .cloned()
+            .into_iter().map(|x| (x.clone(), self.activation() / defined_neurons_len as f32))
+            .collect()
     }
 
     pub(crate) fn deactivate_neighbours(&mut self) {
@@ -217,19 +250,21 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
             DataCategory::Numerical | DataCategory::Ordinal => true,
             _ => false
         };
-        let mut neurons = if propagate_horizontal && is_fuzzy_ok {
+        let neurons_activation = if propagate_horizontal && is_fuzzy_ok {
             self.fuzzy_activate(signal)
         } else {
             self.simple_activate(signal)
         };
 
+        let mut neurons: HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> = HashMap::new();
+
         if propagate_vertical {
-            for (_id, neuron) in &neurons.clone() {
+            for (neuron, activation) in &neurons_activation {
+                neurons.insert(neuron.borrow().id(), neuron.clone());
                 if !neuron.borrow().is_sensor() {
-                    let output_signal = self.activation / self.defined_neurons().len() as f32;
                     neurons.extend(
                         neuron.borrow_mut().activate(
-                            output_signal, propagate_horizontal, propagate_vertical
+                            *activation, propagate_horizontal, propagate_vertical
                         )
                     );
                 }
