@@ -10,7 +10,7 @@ use std::{
 use bionet_common::{ 
     sensor::SensorData,
     neuron::{ Neuron, NeuronID },
-    data::{ DataCategory, DataType, DataDeductor },
+    data::{ DataCategory, DataType, DataDeductor, DataTypeValue },
 };
 
 use super::{
@@ -31,7 +31,12 @@ where Key: SensorData, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
+where 
+    Key: SensorData, 
+    [(); ORDER + 1]:, 
+    PhantomData<Key>: DataDeductor,
+    DataTypeValue: From<Key>
+{
     pub fn new(name: &str) -> ASAGraph<Key, ORDER> {
         if ORDER < 3 {
             panic!("Graph order must be >= 3");

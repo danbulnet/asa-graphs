@@ -15,7 +15,7 @@ use bionet_common::{
         defining_connection::DefiningConnection
     },
     sensor::SensorData,
-    data::{ DataDeductor, DataCategory }
+    data::{ DataDeductor, DataCategory, DataTypeValue }
 };
 
 #[derive(Clone)]
@@ -33,7 +33,11 @@ where Key: SensorData, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Element<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor  {
+where 
+    Key: SensorData, [(); ORDER + 1]:, 
+    PhantomData<Key>: DataDeductor, 
+    DataTypeValue: From<Key> 
+{
     pub const INTERELEMENT_ACTIVATION_THRESHOLD: f32 = 0.8;
 
     pub fn new(key: &Key, parent: &Rc<str>)
@@ -194,7 +198,7 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor  {
 }
 
 impl<Key, const ORDER: usize> Neuron for Element<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
+where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor, DataTypeValue: From<Key> {
     fn id(&self) -> NeuronID {
         NeuronID {
             id: Rc::from(self.key.to_string()),
@@ -212,6 +216,10 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
         HashMap::from(
             [(self.id(), self.self_ptr.upgrade().unwrap() as Rc<RefCell<dyn Neuron>>)]
         ) 
+    }
+
+    fn explain_one(&self, _parent: Rc<str>) -> Option<DataTypeValue> {
+        Some((*dyn_clone::clone_box(&self.key)).into())
     }
 
     fn activate(
@@ -299,7 +307,12 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
 }
 
 impl<Key, const ORDER: usize> NeuronConnect for Element<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
+where 
+    Key: SensorData, 
+    [(); ORDER + 1]:, 
+    PhantomData<Key>: DataDeductor,
+    DataTypeValue: From<Key>
+{
     fn connect_to(
         &mut self, to: Rc<RefCell<dyn Neuron>>, kind: ConnectionKind
     ) -> Result<Rc<RefCell<dyn Connection<From = dyn Neuron, To = dyn Neuron>>>, String> {

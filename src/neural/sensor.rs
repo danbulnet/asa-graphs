@@ -6,7 +6,7 @@ use std::{
 };
 
 use bionet_common::{
-    data::{ DataCategory, DataType, DataDeductor },
+    data::{ DataCategory, DataType, DataDeductor, DataTypeValue },
     neuron::{ Neuron, NeuronID },
     sensor::{ Sensor, SensorData }
 };
@@ -14,7 +14,12 @@ use bionet_common::{
 use super::graph::ASAGraph;
 
 impl<Key, const ORDER: usize> Sensor<Key> for ASAGraph<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
+where 
+    Key: SensorData, 
+    [(); ORDER + 1]:, 
+    PhantomData<Key>: DataDeductor,
+    DataTypeValue: From<Key>
+{
     fn id(&self) -> Rc<str> { self.id() }
 
     fn data_type(&self) -> DataType { self.data_type() }

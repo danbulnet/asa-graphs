@@ -9,7 +9,7 @@ use std::{
 use bionet_common::{
     algorithms::SearchAlgorithm,
     sensor::SensorData,
-    data::DataDeductor
+    data::{ DataDeductor, DataTypeValue }
 };
 
 use super::element::Element;
@@ -26,7 +26,12 @@ where Key: SensorData, [(); ORDER + 1]: {
 }
 
 impl<Key, const ORDER: usize> Node<Key, ORDER> 
-where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
+where 
+    Key: SensorData, 
+    [(); ORDER + 1]:, 
+    PhantomData<Key>: DataDeductor,
+    DataTypeValue: From<Key>
+{
     pub fn new(
         is_leaf: bool, parent: Option<Weak<RefCell<Node<Key, ORDER>>>>
     ) -> Node<Key, ORDER> {
