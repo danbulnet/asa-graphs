@@ -181,34 +181,6 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor  {
             .collect()
     }
 
-    pub(crate) fn deactivate_neighbours(&mut self) {
-        self.activation = 0.0f32;
-
-        if let Some(next) = &self.next {
-            let mut element = next.0.upgrade().unwrap();
-            loop {
-                element.borrow_mut().activation = 0.0f32;
-                let new_element = match &element.borrow().next {
-                    Some(next) => next.0.upgrade().unwrap(),
-                    None => break
-                };
-                element = new_element;
-            }
-        }
-        
-        if let Some(prev) = &self.prev {
-            let mut element = prev.0.upgrade().unwrap();
-            loop {
-                element.borrow_mut().activation = 0.0f32;
-                let new_element = match &element.borrow().prev {
-                    Some(prev) => prev.0.upgrade().unwrap(),
-                    None => break
-                };
-                element = new_element;
-            }
-        }
-    }
-
     pub fn defined_neurons(&self) -> HashMap<NeuronID, Rc<RefCell<dyn Neuron>>> {
         let mut neurons = HashMap::new();
         for (_id, definition) in &self.definitions {
@@ -277,11 +249,50 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor {
     fn deactivate(&mut self, propagate_horizontal: bool, propagate_vertical: bool) {
         self.activation = 0.0f32;
 
-        if propagate_horizontal { self.deactivate_neighbours(); }
-
+        let mut neurons: Vec<Rc<RefCell<dyn Neuron>>> = Vec::new();
         if propagate_vertical {
-            for (_id, neuron) in &self.defined_neurons() {
-                neuron.borrow_mut().deactivate(propagate_horizontal, propagate_vertical);
+            neurons = self.defined_neurons().values().cloned().collect();
+        }
+
+        if propagate_horizontal{
+            if let Some(next) = &self.next {
+                let mut element = next.0.upgrade().unwrap();
+                loop {
+                    element.borrow_mut().activation = 0.0f32;
+                    if propagate_vertical {
+                        neurons.append(
+                            &mut element.borrow().defined_neurons().values().cloned().collect()
+                        );
+                    }
+                    let new_element = match &element.borrow().next {
+                        Some(next) => next.0.upgrade().unwrap(),
+                        None => break
+                    };
+                    element = new_element;
+                }
+            }
+            
+            if let Some(prev) = &self.prev {
+                let mut element = prev.0.upgrade().unwrap();
+                loop {
+                    element.borrow_mut().activation = 0.0f32;
+                    if propagate_vertical {
+                        neurons.append(
+                            &mut element.borrow().defined_neurons().values().cloned().collect()
+                        );
+                    };
+                    let new_element = match &element.borrow().prev {
+                        Some(prev) => prev.0.upgrade().unwrap(),
+                        None => break
+                    };
+                    element = new_element;
+                }
+            }
+        }
+        
+        if propagate_vertical {
+            for neuron in neurons {
+                neuron.borrow_mut().deactivate(propagate_horizontal, propagate_vertical)
             }
         }
     }
@@ -554,7 +565,7 @@ mod tests {
         }
 
         let mid_element = graph.borrow().search(&5).unwrap();
-        mid_element.borrow_mut().deactivate_neighbours();
+        mid_element.borrow_mut().deactivate(true, true);
         assert_eq!(mid_element.borrow().activation(), 0.0f32);
         let mid_element_ref =  mid_element.borrow();
         
