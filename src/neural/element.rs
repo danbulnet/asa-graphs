@@ -15,7 +15,7 @@ use bionet_common::{
         defining_connection::DefiningConnection
     },
     sensor::SensorData,
-    data::{ DataDeductor, DataCategory, DataTypeValue }
+    data::{ DataDeductor, DataCategory, DataTypeValue, DataType }
 };
 
 #[derive(Clone)]
@@ -209,6 +209,8 @@ where Key: SensorData, [(); ORDER + 1]:, PhantomData<Key>: DataDeductor, DataTyp
     fn activation(&self) -> f32 { self.activation }
 
     fn is_sensor(&self) -> bool { true }
+
+    fn data_type(&self) -> DataType { self.data_type.data_type() }
 
     fn counter(&self) -> usize { self.counter }
     
